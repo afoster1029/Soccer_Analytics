@@ -1,0 +1,129 @@
+---
+title: "ML_soccer"
+author: "Alex Foster"
+date: "4/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(reshape2)
+library(tidyr)
+
+library(rstan)
+library(rstanarm)
+library(bayesplot)
+
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(reshape2)
+library(tidyr)
+
+library(rstan)
+library(rstanarm)
+library(bayesplot)
+library(StatsBombR)
+```
+
+
+```{r}
+events <- StatsBombFreeEvents()
+comp <- FreeCompetitions()
+matches <- FreeMatches(comp)
+```
+
+```{r}
+# load in match event data and parse for only la liga matches
+la_liga <- matches[matches[,'competition.competition_name']=="La Liga",]
+match_idx <- 1
+match = get.matchFree(la_liga[match_idx,])
+```
+
+```{r}
+num_games = dim(la_liga)[1]
+count = 3
+# matches = dataframe
+matches = match = get.matchFree(la_liga[1,])
+names(matches)
+for (row in 2:nrow(la_liga)) {
+  matches = rbind(get.matchFree(la_liga[row,]), matches)
+}
+dim(matches)
+```
+
+```{r}
+# count how many occurences of each stat occured. Stats interested in at the moment are: shots, passes, fouls
+computeMatchStats <- function(match_idx, teams=c('Real Betis', 'Barcelona'), stats = c('Pass', 'Shot', 'Fouls Committed')) {
+  team_stats = data.frame("Team" = teams, "Passes" = c(0,0), "Shots" = c(0,0), "FC" = c(0,0))
+  for (row in 1:nrow(match)) {
+    event = match[row,]
+
+    team = event$team.name
+    #print(team)
+    if (event[,'type.name'] == "Pass") {
+        team_stats$Passes[which(team_stats$Team == team)] <- team_stats$Passes[which(team_stats$Team == team)] + 1
+    }
+    if (event[,'type.name'] == "Shot") {
+        team_stats$Shots[which(team_stats$Team == team)] <- team_stats$Shots[which(team_stats$Team == team)] + 1
+    }
+    if (event[,'type.name'] == "Foul Committed") {
+        team_stats$FC[which(team_stats$Team == team)] <- team_stats$FC[which(team_stats$Team == team)] + 1
+    }
+  }
+  return(team_stats)
+}
+
+computeMatchStats(match)
+```
+
+
+```{r}
+# get overall info about the match
+team_names <- la_liga[match_idx,] %>%
+  select(home_team.home_team_name, away_team.away_team_name,home_score,away_score)
+
+# # possession by minute of the game
+# match %>%
+#   select(possession)
+
+# view number of events per minute
+match %>%
+  count(minute) %>%
+  ggplot(aes(x=minute,y = n)) +geom_bar(stat = "identity")
+
+# number of occurences of each type of event
+match %>%
+  count(type.name) %>%
+  ggplot(aes(x=type.name, weight=n))+
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Number of shots from each team and where the play originated from.
+event_shots = match[match[,"type.name"] == 'Shot',]
+event_shots %>%
+  count(play_pattern.name, team.name) %>%
+  ggplot(aes(x = team.name, fill = play_pattern.name, weight = n)) +
+  geom_bar()
+# Number of shots from each team and the outcome of that shot. 
+event_shots %>%
+  count(shot.outcome.name, team.name) %>%
+  ggplot(aes(x = team.name, fill = shot.outcome.name, weight = n)) +
+  geom_bar() + 
+  scale_fill_hue() +
+  theme_minimal()
+```
+
+
+```{r}
+# computeSeasonStats <- function()
+match
+
+```
+
+
+
+
