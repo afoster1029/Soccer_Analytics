@@ -1,0 +1,199 @@
+---
+title: "ml_epl"
+author: "Alex Foster"
+date: "4/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load packages
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(reshape2)
+library(tidyr)
+library(readr)
+
+library(rstan)
+library(rstanarm)
+library(bayesplot)
+library(bayesrules)
+library(lubridate)
+library(Matrix)
+```
+
+
+
+#### Load in the data
+```{R}
+epl_1819 <- read_csv("season-1819_csv.csv") %>%
+  mutate(season = 1819, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0) %>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+epl_1718 <- read_csv("season-1718_csv.csv") %>%
+  mutate(season = 1718, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0) %>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+epl_1617 <- read_csv("season-1617_csv.csv") %>%
+  mutate(season = 1617, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0)%>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+
+seasons = rbind(epl_1617,epl_1718)
+#seasons = rbind(epl_1718, epl_1819)
+dim(seasons)
+head(seasons)
+```
+
+#### Data Wrangling
+* Need to make a dataframe where each row represents a game and has the following columns 
+  * HT -- Home Team
+  * AT -- Away Team
+  * HTR -- Half Time Result
+  * FTR -- Full Time Result
+  * HTHG -- Half Time Home Goals
+  * HTAG -- Half Time Away Goals
+  * HAGG --  Home Average Goals per Game
+  * AAGG -- Away Average Goals per Game 
+  * HTP -- Home Team Position in the league
+  * ATP -- Away Team Position in the league
+  * Datetime -- lubricate datetime object 
+* Response variable: FTR
+* Explanatory variables: HTR, HTHG, HTAG, HAGG, AAGG, HTP, ATP 
+
+
+```{r}
+epl_1617$Datetime
+seasons_df <- seasons
+
+current_date <- seasons_df[1,]$Datetime
+```
+
+```{r}
+# Function that computes the table of the season given a certain date in the season.
+# Returns a dataframe that provides stats dependent on the progress of the given season 
+compute_table <- function(date, df) {
+  current_season = 1617
+  df_subset <- df[which(df$season == current_season & df$Datetime <= date), ] # get games from that season and up to the given data
+  
+  # get team names
+  names <- unique(df_subset$HomeTeam)
+  
+  # initialize beginning of season table
+  table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
+
+  for (row in 1:nrow(df_subset)) {
+    current_r =df_subset[row, ]
+    # Update info for home team
+    home <- current_r$HomeTeam
+    table$GA[which(table$Team == home)] <- table$GA[which(table$Team == home)] + current_r$FTAG# GA
+    table$GF[which(table$Team == home)] <- table$GF[which(table$Team == home)]+current_r$FTHG# GF
+    table$GP[which(table$Team == home)] <- table$GP[which(table$Team == home)]+1
+
+    # Update info for away team
+    away <- current_r$AwayTeam
+    table$GA[which(table$Team == away)] <- table$GA[which(table$Team == away)]+current_r$FTHG# GA
+    table$GF[which(table$Team == away)] <- table$GF[which(table$Team == away)]+current_r$FTAG# GF
+    table$GP[which(table$Team == away)] <- table$GP[which(table$Team == away)]+1
+
+    # Award points to winner and for ties.
+    if (current_r$FTR == 'H'){ # home wins
+      table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 3
+    } else if (current_r$FTR == 'A'){ # away wins
+      table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 3
+    } else { # draw
+      table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 1
+      table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 1
+    }
+  }
+  # compute goal differential
+  table <- table %>%
+    mutate('GD' = GF - GA)
+  # add AGSG column that represents the avg goals scored per game
+  table <- table %>%
+    mutate(AGSG = GF / GP)
+  # add AGCG column that represents the avg goals conceded per game
+  table <- table %>%
+    mutate(AGCG = GA / GP)
+  # Add position column that indicates what place each team is in.
+  table <- table[with(table,order(table$Points, table$GD)),]
+  table$Position <- length(names):1
+  return(table)
+}
+
+```
+
+  
+```{r}
+# Function takes in dataframe with all matches. Then loops through each match. For every match it computes the league standings prior to the given match. 
+# Uses league standings to add more explanatory variables (HAGG and AAGG).
+add_explantory_var <- function(df) {
+    for (row in 1:nrow(df)){ # iterate through every game
+        match = df[row,]
+        current_date = match$Datetime
+       # print(month(current_date))
+        if (month(current_date) <  10 & month(current_date) >= 8){
+            
+          # compute table
+            table <- compute_table(current_date, df)
+           
+          # get HAGG and AAGG for dateframe
+            if (match$HomeTeam %in% table$Team) {
+              #print(table$Position[which(table$Team == match$AwayTeam)])
+              
+              df[row,]$HAGG <- table$HGSG[which(table$Team == match$HomeTeam)]
+             # df[row,]$HTP <- table$Position[which(table$Team == match$AwayTeam)]
+            }
+            if (match$AwayTeam %in% table$Team) {
+              df[row,]$AAGG <- table$AGSG[which(table$Team == match$AwayTeam)]
+             # df[row,]$ATP <- table$Position[which(table$Team == match$AwayTeam)]
+            }
+        } 
+    }
+ # print(row)
+  return(df)
+  
+  }
+
+seasons_df <- add_explantory_var(seasons_df)
+head(seasons_df)
+```
+
+#### Data Visualizations
+
+```{r}
+# Distrbution of full time results 
+seasons_df %>% 
+  ggplot(aes(x = FTR)) +
+  geom_bar() +
+  theme_minimal()
+
+# Distribution of full time results based on the HTR
+seasons_df %>%
+  ggplot(aes(x = FTR, fill = HTR)) +
+  geom_bar() +
+  scale_fill_hue() +
+  theme_minimal()
+
+# Examing goals scored by away and home teams by date and facet by season  
+ggplot(seasons_df) +
+ aes(x = Datetime, y = FTHG) +
+ geom_line(size = 1L, colour = "#0c4c8a") +
+ theme_minimal() +
+ facet_wrap(vars(season))
+ggplot(seasons_df) +
+ aes(x = Datetime, y = FTAG) +
+ geom_line(size = 1L, colour = "#0c4c8a") +
+ theme_minimal() +
+ facet_wrap(vars(season))
+
+# Examine average goals scored as the season progresses
+seasons_df %>%
+  ggplot(aes(x=Datetime, y=HAGG)) +
+  geom_line() +
+  facet_wrap(~season)
+seasons_df %>%
+  ggplot(aes(x=Datetime, y=AAGG)) +
+  geom_line() +
+  facet_wrap(~season)
+
+
+```

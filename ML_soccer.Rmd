@@ -41,14 +41,16 @@ matches <- FreeMatches(comp)
 la_liga <- matches[matches[,'competition.competition_name']=="La Liga",]
 match_idx <- 1
 match = get.matchFree(la_liga[match_idx,])
+dim(la_liga)
 ```
 
 ```{r}
 num_games = dim(la_liga)[1]
 count = 3
 # matches = dataframe
-matches = match = get.matchFree(la_liga[1,])
-names(matches)
+matches = data.frame(get.matchFree(la_liga[1,]))
+x = data.frame('x' = c(1,2,3,4))
+
 for (row in 2:nrow(la_liga)) {
   matches = rbind(get.matchFree(la_liga[row,]), matches)
 }
