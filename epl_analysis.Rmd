@@ -1,6 +1,6 @@
 ---
 title: "ml_epl"
-author: "Alex Foster"
+author: "Alex Foster, Chris Bajek, Webster An"
 date: "4/23/2020"
 output: html_document
 ---
@@ -17,8 +17,6 @@ library(readr)
 
 library(rstan)
 library(rstanarm)
-library(bayesplot)
-library(bayesrules)
 library(lubridate)
 library(Matrix)
 ```
