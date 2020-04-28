@@ -1,5 +1,6 @@
 ---
 title: "ml_epl"
+author: "Alex Foster, Chris Bajek, Webster An"
 date: "4/23/2020"
 output: html_document
 ---
@@ -15,6 +16,7 @@ library(tidyr)
 library(readr)
 <<<<<<< HEAD
 =======
+
 library(rstan)
 library(rstanarm)
 >>>>>>> 2349f5515f540cb8303140662f0e0dde7b0dcf0d
