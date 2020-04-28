@@ -14,12 +14,6 @@ library(janitor)
 library(reshape2)
 library(tidyr)
 library(readr)
-<<<<<<< HEAD
-=======
-
-library(rstan)
-library(rstanarm)
->>>>>>> 2349f5515f540cb8303140662f0e0dde7b0dcf0d
 library(lubridate)
 library(Matrix)
 
@@ -69,8 +63,6 @@ head(seasons)
 seasons_df <- seasons
 
 current_date <- seasons_df[1,]$Datetime
-
-seasons_df[which(seasons_df$season == current_season & seasons_df$Datetime <= current_date), ]
 ```
 
 ```{r}
@@ -136,16 +128,14 @@ head(table)
 ```
 
 
-
-  
 ```{r}
-# Function takes in dataframe with all matches. Then loops through each match. For every match it computes the league standings prior to the given match. 
+# Function takes in dataframe with all matches. Then loops through each game For every match it computes the league standings prior to the given game 
 # Uses league standings to add more explanatory variables (HAGG and AAGG).
 add_explantory_var <- function(df) {
     for (row in 1:nrow(df)){ # iterate through every game
-        current_date = df[row,]$Datetime
-        # print(month(current_date))
-        if (month(current_date) <  10 & month(current_date) >= 8){
+        current_date = df[row,]$Datetime # current date is the date of the game 
+
+        if (month(current_date) <  10 & month(current_date) >= 8){ # check if the game occurs at the beginning of the season
             
             # compute table
             table <- compute_table(current_date, df)
@@ -207,7 +197,9 @@ seasons_df %>%
   geom_line() +
   facet_wrap(~season)
 
-# 
-
-
 ```
+
+#### Modeling 
+* Plan is to focus on one team. 
+  * Everton. 
+
