@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+
 # Load packages
 library(ggplot2)
 library(dplyr)
@@ -14,15 +14,14 @@ library(janitor)
 library(reshape2)
 library(tidyr)
 library(readr)
-
-library(rstan)
-library(rstanarm)
-library(bayesplot)
-library(bayesrules)
 library(lubridate)
 library(Matrix)
-```
 
+```
+##### Analyze English Premier League Data with Machine Learning
+#### Research Question: Can we predict the outcome (Home win, Away win or Draw) of the a Premier League match. 
+* We intend on using multiple seasons. Our data source (https://datahub.io/sports-data/english-premier-league#data) has data for the past 10 years. 
+* Below we have begun adding explanatory variables and created visualizations for two seasons of matches.
 
 
 #### Load in the data
@@ -61,65 +60,76 @@ head(seasons)
 
 
 ```{r}
-epl_1617$Datetime
 seasons_df <- seasons
 
 current_date <- seasons_df[1,]$Datetime
+
+seasons_df[which(seasons_df$season == current_season & seasons_df$Datetime <= current_date), ]
 ```
 
 ```{r}
-# Function that computes the table of the season given a certain date in the season.
+# Code below computes the table of the season given a certain date in the season.
 # Returns a dataframe that provides stats dependent on the progress of the given season 
-compute_table <- function(date, df) {
-  current_season = 1617
-  df_subset <- df[which(df$season == current_season & df$Datetime <= date), ] # get games from that season and up to the given data
-  
-  # get team names
-  names <- unique(df_subset$HomeTeam)
-  
-  # initialize beginning of season table
-  table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
-
-  for (row in 1:nrow(df_subset)) {
-    current_r =df_subset[row, ]
-    # Update info for home team
-    home <- current_r$HomeTeam
-    table$GA[which(table$Team == home)] <- table$GA[which(table$Team == home)] + current_r$FTAG# GA
-    table$GF[which(table$Team == home)] <- table$GF[which(table$Team == home)]+current_r$FTHG# GF
-    table$GP[which(table$Team == home)] <- table$GP[which(table$Team == home)]+1
-
-    # Update info for away team
-    away <- current_r$AwayTeam
-    table$GA[which(table$Team == away)] <- table$GA[which(table$Team == away)]+current_r$FTHG# GA
-    table$GF[which(table$Team == away)] <- table$GF[which(table$Team == away)]+current_r$FTAG# GF
-    table$GP[which(table$Team == away)] <- table$GP[which(table$Team == away)]+1
-
-    # Award points to winner and for ties.
-    if (current_r$FTR == 'H'){ # home wins
-      table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 3
-    } else if (current_r$FTR == 'A'){ # away wins
-      table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 3
-    } else { # draw
-      table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 1
-      table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 1
+# Tried to write a function but it wouldn't knit.
+compute_table <- function(df = seasons_df, date) {
+    current_season = 1617
+    df_subset <- df[which(df$season == current_season & df$Datetime <= date), ] # get games from that season and up to the given data
+    
+    # get team names
+    names <- unique(df_subset$HomeTeam)
+    
+    # initialize beginning of season table
+    table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
+    
+    for (row in 1:nrow(df_subset)) {
+      current_r =df_subset[row, ]
+      # Update info for home team
+      home <- current_r$HomeTeam
+      table$GA[which(table$Team == home)] <- table$GA[which(table$Team == home)] + current_r$FTAG# GA
+      table$GF[which(table$Team == home)] <- table$GF[which(table$Team == home)]+current_r$FTHG# GF
+      table$GP[which(table$Team == home)] <- table$GP[which(table$Team == home)]+1
+    
+      # Update info for away team
+      away <- current_r$AwayTeam
+      table$GA[which(table$Team == away)] <- table$GA[which(table$Team == away)]+current_r$FTHG# GA
+      table$GF[which(table$Team == away)] <- table$GF[which(table$Team == away)]+current_r$FTAG# GF
+      table$GP[which(table$Team == away)] <- table$GP[which(table$Team == away)]+1
+    
+      # Award points to winner and for ties.
+      if (current_r$FTR == 'H'){ # home wins
+        table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 3
+      } else if (current_r$FTR == 'A'){ # away wins
+        table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 3
+      } else { # draw
+        table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 1
+        table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 1
+      }
     }
-  }
-  # compute goal differential
-  table <- table %>%
-    mutate('GD' = GF - GA)
-  # add AGSG column that represents the avg goals scored per game
-  table <- table %>%
-    mutate(AGSG = GF / GP)
-  # add AGCG column that represents the avg goals conceded per game
-  table <- table %>%
-    mutate(AGCG = GA / GP)
-  # Add position column that indicates what place each team is in.
-  table <- table[with(table,order(table$Points, table$GD)),]
-  table$Position <- length(names):1
-  return(table)
+    # compute goal differential
+    table <- table %>%
+      mutate('GD' = GF - GA)
+    # add AGSG column that represents the avg goals scored per game
+    table <- table %>%
+      mutate(AGSG = GF / GP)
+    # add AGCG column that represents the avg goals conceded per game
+    table <- table %>%
+      mutate(AGCG = GA / GP)
+    # Add position column that indicates what place each team is in.
+    table <- table[with(table,order(table$Points, table$GD)),]
+    table$Position <- length(names):1
+  
+    return(table)
 }
+```
+
+```{r}
+# testing compute_table function
+table = compute_table(seasons_df,current_date)  
+head(table)
 
 ```
+
+
 
   
 ```{r}
@@ -127,34 +137,30 @@ compute_table <- function(date, df) {
 # Uses league standings to add more explanatory variables (HAGG and AAGG).
 add_explantory_var <- function(df) {
     for (row in 1:nrow(df)){ # iterate through every game
-        match = df[row,]
-        current_date = match$Datetime
-       # print(month(current_date))
+        current_date = df[row,]$Datetime
+        # print(month(current_date))
         if (month(current_date) <  10 & month(current_date) >= 8){
             
-          # compute table
+            # compute table
             table <- compute_table(current_date, df)
-           
-          # get HAGG and AAGG for dateframe
+            #print(df[row,])
+            # get HAGG and AAGG for dateframe
             if (match$HomeTeam %in% table$Team) {
-              #print(table$Position[which(table$Team == match$AwayTeam)])
-              
-              df[row,]$HAGG <- table$HGSG[which(table$Team == match$HomeTeam)]
-             # df[row,]$HTP <- table$Position[which(table$Team == match$AwayTeam)]
+                df[row,]$HAGG <- table$HGSG[which(table$Team == match$HomeTeam)]
+                df[row,]$HTP <- table$Position[which(table$Team == match$AwayTeam)]
             }
             if (match$AwayTeam %in% table$Team) {
-              df[row,]$AAGG <- table$AGSG[which(table$Team == match$AwayTeam)]
-             # df[row,]$ATP <- table$Position[which(table$Team == match$AwayTeam)]
+                df[row,]$AAGG <- table$AGSG[which(table$Team == match$AwayTeam)]
+                df[row,]$ATP <- table$Position[which(table$Team == match$AwayTeam)]
             }
         } 
     }
- # print(row)
   return(df)
-  
   }
 
 seasons_df <- add_explantory_var(seasons_df)
 head(seasons_df)
+
 ```
 
 #### Data Visualizations
@@ -194,6 +200,8 @@ seasons_df %>%
   ggplot(aes(x=Datetime, y=AAGG)) +
   geom_line() +
   facet_wrap(~season)
+
+# 
 
 
 ```
