@@ -27,18 +27,18 @@ library(Matrix)
 #### Load in the data
 ```{R}
 epl_1819 <- read_csv("season-1819_csv.csv") %>%
-  mutate(season = 1819, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0) %>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+  mutate(season = 1819, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
 epl_1718 <- read_csv("season-1718_csv.csv") %>%
-  mutate(season = 1718, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0) %>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+  mutate(season = 1718, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
 epl_1617 <- read_csv("season-1617_csv.csv") %>%
-  mutate(season = 1617, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0)%>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP)
+  mutate(season = 1617, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0)%>%
+  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
 
 seasons = rbind(epl_1617,epl_1718)
-#seasons = rbind(epl_1718, epl_1819)
-dim(seasons)
+seasons = rbind(seasons, epl_1819)
+print(unique(seasons$season))
 head(seasons)
 ```
 
@@ -52,6 +52,8 @@ head(seasons)
   * HTAG -- Half Time Away Goals
   * HAGG --  Home Average Goals per Game
   * AAGG -- Away Average Goals per Game 
+  * HACG -- Home Average Conceded per Game
+  * AACG -- Away Average Conceded per Game
   * HTP -- Home Team Position in the league
   * ATP -- Away Team Position in the league
   * Datetime -- lubricate datetime object 
@@ -61,20 +63,24 @@ head(seasons)
 
 ```{r}
 seasons_df <- seasons
-
-current_date <- seasons_df[1,]$Datetime
+game = seasons_df[40,]
+print(game)
+current_date <- game$Datetime
+df_subset <- df[which(df$season == year(current_date) & df$Datetime <= current_date),]
+df_subset
 ```
 
 ```{r}
+
+
+
+
 # Code below computes the table of the season given a certain date in the season.
 # Returns a dataframe that provides stats dependent on the progress of the given season 
 # Tried to write a function but it wouldn't knit.
-compute_table <- function(df = seasons_df, date) {
-    current_season = 1617
-    df_subset <- df[which(df$season == current_season & df$Datetime <= date), ] # get games from that season and up to the given data
-    
-    # get team names
-    names <- unique(df_subset$HomeTeam)
+compute_table <- function(df = seasons_df, date, season) {
+    df_subset <- df[which(df$Datetime <= date),] # get games from that season and up to the given data
+    names <- unique(df_subset$HomeTeam) # get team names
     
     # initialize beginning of season table
     table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
@@ -122,80 +128,125 @@ compute_table <- function(df = seasons_df, date) {
 
 ```{r}
 # testing compute_table function
-table = compute_table(seasons_df,current_date)  
+table = compute_table(seasons_df,current_date, 1617)  
 head(table)
+```
+
+
+```{r}
+# Function takes in dataframe with all matches of a SINGLE season. Then loops through each game For every match it computes the league standings prior to the given game
+# Uses league standings to add more explanatory variables (HAGG and AAGG).
+# Returns a dataframe of the games with each game updated for it's season statistics.
+add_explantory_var <- function(df) {
+    for (row in 1:nrow(df)){ # iterate through every game
+        cur_season <- unique(df$season) # for computing the table
+
+        current_date = df[row,]$Datetime # current date is the date of the game 
+        
+        if (month(current_date) == 8){
+          next
+        }
+        # compute table
+        table <- compute_table(df, current_date, cur_season)
+
+        # Check if only 1 game has been played. Not worth computing stats if it's the first game of the season.
+        if (table[1,]$GP != 1) {
+            game = df[row,]
+            # update HAGG, HACG, AACG and AAGG values for each game dateframe
+            if (game$HomeTeam %in% table$Team & game$AwayTeam %in% table$Team) { # checks that both teams are in the table results.
+                # home team stats
+                df[row,]$HAGG <- table$AGSG[which(table$Team == game$HomeTeam)]
+                df[row,]$HACG <- table$AGCG[which(table$Team == game$HomeTeam)]
+                df[row,]$HTP <- table$Position[which(table$Team == game$HomeTeam)]
+                # away teams stats
+                df[row,]$AAGG <- table$AGSG[which(table$Team == game$AwayTeam)]
+                df[row,]$AACG <- table$AGCG[which(table$Team == game$AwayTeam)]
+                df[row,]$ATP <- table$Position[which(table$Team == game$AwayTeam)]
+
+            }
+        }
+  }
+  return(df)
+}
+
+
 
 ```
 
 
 ```{r}
-# Function takes in dataframe with all matches. Then loops through each game For every match it computes the league standings prior to the given game 
-# Uses league standings to add more explanatory variables (HAGG and AAGG).
-add_explantory_var <- function(df) {
-    for (row in 1:nrow(df)){ # iterate through every game
-        current_date = df[row,]$Datetime # current date is the date of the game 
+df_1617 <- add_explantory_var(seasons_df[which(seasons_df$season == 1617),])
+df_1718 <- add_explantory_var(seasons_df[which(seasons_df$season == 1718),])
+df_1819 <- add_explantory_var(seasons_df[which(seasons_df$season == 1819),])
+final_df <- rbind(df_1617, df_1718)
+final_df <- rbind(final_df, df_1819)
+final_df
 
-        if (month(current_date) <  10 & month(current_date) >= 8){ # check if the game occurs at the beginning of the season
-            
-            # compute table
-            table <- compute_table(current_date, df)
-            #print(df[row,])
-            # get HAGG and AAGG for dateframe
-            if (match$HomeTeam %in% table$Team) {
-                df[row,]$HAGG <- table$HGSG[which(table$Team == match$HomeTeam)]
-                df[row,]$HTP <- table$Position[which(table$Team == match$AwayTeam)]
-            }
-            if (match$AwayTeam %in% table$Team) {
-                df[row,]$AAGG <- table$AGSG[which(table$Team == match$AwayTeam)]
-                df[row,]$ATP <- table$Position[which(table$Team == match$AwayTeam)]
-            }
-        } 
+```
+
+##### Putting it all together
+```{r}
+initialize_season <- sort(unique(seasons_df$season))[1]
+final_df <- add_explantory_var(seasons_df[which(seasons_df$season == initialize_season),]) # initialize with the teams home games from the 1617 season
+# loop through each season in the dataset.
+for (season in unique(seasons_df$season)) {
+    if (season != initialize_season) {
+        df = seasons_df[which(seasons_df$season == season),]
+        update_df = add_explantory_var(df)
+
+       final_df = rbind(final_df, update_df)
     }
-  return(df)
-  }
+}
 
-seasons_df <- add_explantory_var(seasons_df)
-head(seasons_df)
+
+
+cat('Final dataset includes: ')
+cat("\n")
+cat("Seasons:",unique(final_df$season))
+cat("\n")
+cat("Rows:",nrow(final_df))
 
 ```
 
 #### Data Visualizations
 
 ```{r}
-# Distrbution of full time results 
-seasons_df %>% 
+# Distrbution of full time results by season
+final_df %>% 
   ggplot(aes(x = FTR)) +
-  geom_bar() +
+  geom_bar(colour = "#0c4c8a") +
+  facet_wrap(~season)+
   theme_minimal()
 
-# Distribution of full time results based on the HTR
-seasons_df %>%
+# Distribution of full time results based on the HTR by season
+final_df %>%
   ggplot(aes(x = FTR, fill = HTR)) +
   geom_bar() +
   scale_fill_hue() +
+  facet_wrap(~season)+
   theme_minimal()
 
 # Examing goals scored by away and home teams by date and facet by season  
-ggplot(seasons_df) +
+ggplot(final_df) +
  aes(x = Datetime, y = FTHG) +
  geom_line(size = 1L, colour = "#0c4c8a") +
  theme_minimal() +
- facet_wrap(vars(season))
-ggplot(seasons_df) +
+ facet_wrap(~season)
+ggplot(final_df) +
  aes(x = Datetime, y = FTAG) +
  geom_line(size = 1L, colour = "#0c4c8a") +
  theme_minimal() +
  facet_wrap(vars(season))
 
 # Examine average goals scored as the season progresses
-seasons_df %>%
-  ggplot(aes(x=Datetime, y=HAGG)) +
-  geom_line() +
-  facet_wrap(~season)
-seasons_df %>%
-  ggplot(aes(x=Datetime, y=AAGG)) +
-  geom_line() +
-  facet_wrap(~season)
+# final_df %>%
+#   ggplot(aes(x=Datetime, y=HAGG)) +
+#   geom_line() +
+#   facet_wrap(~season)
+# final_df %>%
+#   ggplot(aes(x=Datetime, y=AAGG)) +
+#   geom_line() +
+#   facet_wrap(~season)
 
 ```
 
