@@ -36,10 +36,10 @@ epl_1617 <- read_csv("season-1617_csv.csv") %>%
   mutate(season = 1617, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0)%>%
   select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
 
-seasons = rbind(epl_1617,epl_1718)
-seasons = rbind(seasons, epl_1819)
-print(unique(seasons$season))
-head(seasons)
+seasons_df = rbind(epl_1617,epl_1718)
+seasons_df = rbind(seasons, epl_1819)
+print(unique(seasons_df$season))
+head(seasons_df)
 ```
 
 #### Data Wrangling
@@ -61,20 +61,9 @@ head(seasons)
 * Explanatory variables: HTR, HTHG, HTAG, HAGG, AAGG, HTP, ATP 
 
 
-```{r}
-seasons_df <- seasons
-game = seasons_df[40,]
-print(game)
-current_date <- game$Datetime
-df_subset <- df[which(df$season == year(current_date) & df$Datetime <= current_date),]
-df_subset
-```
+
 
 ```{r}
-
-
-
-
 # Code below computes the table of the season given a certain date in the season.
 # Returns a dataframe that provides stats dependent on the progress of the given season 
 # Tried to write a function but it wouldn't knit.
