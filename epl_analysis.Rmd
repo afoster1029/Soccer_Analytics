@@ -6,7 +6,6 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-
 # Load packages
 library(ggplot2)
 library(dplyr)
@@ -16,6 +15,8 @@ library(tidyr)
 library(readr)
 library(lubridate)
 library(Matrix)
+library(stringr)
+
 
 ```
 ##### Analyze English Premier League Data with Machine Learning
@@ -25,21 +26,33 @@ library(Matrix)
 
 
 #### Load in the data
-```{R}
-epl_1819 <- read_csv("season-1819_csv.csv") %>%
-  mutate(season = 1819, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
-epl_1718 <- read_csv("season-1718_csv.csv") %>%
-  mutate(season = 1718, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
-epl_1617 <- read_csv("season-1617_csv.csv") %>%
-  mutate(season = 1617, Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0)%>%
-  select(Datetime, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
 
-seasons_df = rbind(epl_1617,epl_1718)
-seasons_df = rbind(seasons, epl_1819)
-print(unique(seasons_df$season))
-head(seasons_df)
+```{r,message=FALSE}
+path = "english-premier-league/data"
+file_names = dir(path,pattern=".csv")
+file_1 <- file_names[1]
+seasons_df <- read_csv(paste(path,file_1,sep="/")) %>%
+  mutate(season = str_sub(file_1,8,11), Datetime = ymd(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
+  select(Datetime,Date, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
+
+
+for (file in file_names) {
+    if (file != file_1){
+        epl_season <- (str_sub(file, 8,11))
+        file_path <- paste(path,file,sep="/")
+    
+        df <- read_csv(file_path) %>%
+      mutate(season = str_sub(file,8,11), Datetime = dmy(Date),HAGG = 0.0, AAGG=0.0, GP = 0, HTP = 0, ATP=0, HACG=0.0,AACG=0.0) %>%
+      select(Datetime, Date, HomeTeam, AwayTeam, FTR,FTAG, FTHG, HTAG, HTHG, HTR,season, HAGG, AAGG,GP, ATP, HTP, HACG, AACG)
+
+        seasons_df = rbind(seasons_df, df)
+    }
+}
+
+cat('\n')
+cat('Dataframe has',nrow(seasons_df),'rows')
+cat('\n')
+cat('Dataframe contains',length(unique(seasons_df$season)),'seasons')
 ```
 
 #### Data Wrangling
@@ -58,9 +71,7 @@ head(seasons_df)
   * ATP -- Away Team Position in the league
   * Datetime -- lubricate datetime object 
 * Response variable: FTR
-* Explanatory variables: HTR, HTHG, HTAG, HAGG, AAGG, HTP, ATP 
-
-
+* Explanatory variables: HTR, HTHG, HTAG, HAGG, AAGG, HTP, ATP, HT, AT
 
 
 ```{r}
@@ -116,22 +127,14 @@ compute_table <- function(df = seasons_df, date, season) {
 ```
 
 ```{r}
-# testing compute_table function
-table = compute_table(seasons_df,current_date, 1617)  
-head(table)
-```
-
-
-```{r}
 # Function takes in dataframe with all matches of a SINGLE season. Then loops through each game For every match it computes the league standings prior to the given game
 # Uses league standings to add more explanatory variables (HAGG and AAGG).
 # Returns a dataframe of the games with each game updated for it's season statistics.
 add_explantory_var <- function(df) {
     for (row in 1:nrow(df)){ # iterate through every game
         cur_season <- unique(df$season) # for computing the table
-
         current_date = df[row,]$Datetime # current date is the date of the game 
-        
+         
         if (month(current_date) == 8){
           next
         }
@@ -157,26 +160,16 @@ add_explantory_var <- function(df) {
   }
   return(df)
 }
-
-
-
-```
-
-
-```{r}
-df_1617 <- add_explantory_var(seasons_df[which(seasons_df$season == 1617),])
-df_1718 <- add_explantory_var(seasons_df[which(seasons_df$season == 1718),])
-df_1819 <- add_explantory_var(seasons_df[which(seasons_df$season == 1819),])
-final_df <- rbind(df_1617, df_1718)
-final_df <- rbind(final_df, df_1819)
-final_df
-
 ```
 
 ##### Putting it all together
+
+
 ```{r}
+
 initialize_season <- sort(unique(seasons_df$season))[1]
-final_df <- add_explantory_var(seasons_df[which(seasons_df$season == initialize_season),]) # initialize with the teams home games from the 1617 season
+final_df <- add_explantory_var(seasons_df[which(seasons_df$season == initialize_season),]) # initialize with the teams home games from the 0910 season
+
 # loop through each season in the dataset.
 for (season in unique(seasons_df$season)) {
     if (season != initialize_season) {
