@@ -7,6 +7,17 @@ output: html_document
 
 ```{r setup, include=FALSE}
 # Load packages
+
+#plotting and exploring
+library(tidyverse) #for plotting and summarizing
+library(GGally) #for nice scatterplot matrix 
+library(ggridges) #for joy/ridge plots
+library(corrplot) #for basic correlation matrix plot
+library(naniar) #for exploring missing values
+library(pdp) #for partial dependence plots, MARS models
+library(rpart.plot) #for plotting decision trees
+library(vip) #NEW for importance plots
+
 library(ggplot2)
 library(dplyr)
 library(janitor)
@@ -16,6 +27,19 @@ library(readr)
 library(lubridate)
 library(Matrix)
 library(stringr)
+
+#modeling
+library(rsample) #for splitting data
+library(recipes) #for keeping track of transformations
+library(caret) #for modeling
+library(leaps) #for variable selection
+library(glmnet) #for LASSO
+library(earth) #for MARS models
+library(rpart) #for decision trees
+library(randomForest) #for bagging and random forests
+library(cluster) #for daisy and pam functions
+
+theme_set(theme_minimal())
 
 
 ```
@@ -135,9 +159,9 @@ add_explantory_var <- function(df) {
         cur_season <- unique(df$season) # for computing the table
         current_date = df[row,]$Datetime # current date is the date of the game 
          
-        if (month(current_date) == 8){
-          next
-        }
+        # if (month(current_date) == 8){
+        #   next
+        # }
         # compute table
         table <- compute_table(df, current_date, cur_season)
 
@@ -233,6 +257,112 @@ ggplot(final_df) +
 ```
 
 #### Modeling 
-* Plan is to focus on one team. 
-  * Everton. 
+* Predict FTR variable which is either H (home win), A (away win) or D (draw)
+
+##### Create training/testing set
+* Going to have most recent season be testing set.
+```{r}
+df_modeling <- final_df %>%
+  select(HomeTeam, AwayTeam, FTR, HTAG, HTHG, HTR, season, HAGG, AAGG, GP, ATP, HTP, HACG, AACG)
+df_train <- df_modeling[which(df_modeling$season != 1819),]
+df_test <- df_modeling[which(df_modeling$season == 1819),]
+
+cat("Training set contains",nrow(df_train), "rows")
+cat('\n')
+cat("Training set contains",nrow(df_test), "rows")
+```
+
+
+##### Decision Tree
+
+```{r}
+set.seed(327)
+epl_tree_cp <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rpart",
+  trControl = trainControl(method = "cv",
+                           number = 5),
+  tuneGrid = data.frame(cp = 10^seq(-4, -2 , 
+                                    length = 50)),
+  na.action = na.omit
+)
+
+```
+
+```{r}
+epl_tree_cp$results %>% 
+  ggplot(aes(x = cp, y = Accuracy)) +
+  geom_line()
+```
+
+
+#### Bagging 
+
+```{r}
+set.seed(327)
+epl_bagging <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rf",
+  trControl = trainControl(method = "cv",
+                           number = 5),
+  tuneGrid = data.frame(mtry = 16),
+  ntree = 100, #number of trees used, default is 500
+  importance = TRUE, #for importance plots later
+  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+  na.action = na.omit
+)
+
+```
+
+```{r}
+plot(epl_bagging$finalModel)
+
+
+```
+
+
+#### Random Forest
+```{r}
+set.seed(327)
+epl_randf_oob <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rf",
+  trControl = trainControl(method = "oob"),
+  tuneGrid = data.frame(mtry = c(2,4,6,8,10,12)),
+  ntree = 200, #number of trees used, default is 500
+  importance = TRUE, #for importance plots later
+  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+  na.action = na.omit
+)
+
+```
+
+```{r}
+plot(epl_randf_oob$finalModel)
+
+```
+
+
+```{r}
+ggplot(epl_randf_oob)
+df_train
+vip(epl_randf_oob, num_features = 13, bar = FALSE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
