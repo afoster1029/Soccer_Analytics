@@ -169,7 +169,6 @@ write.csv(USA_final,"USA_final.csv", row.names = TRUE)
 # Read in dataset (avoid long code run)
 MLS_df <- read_csv("USA_final.csv",)
 MLS_df <- MLS_df[which(MLS_df$PH != 'USA'),]
-
 ```
 ##### Putting it all together
 ```{r}
@@ -287,10 +286,9 @@ Predict FTR variable which is either H (home win), A (away win) or D (draw)
 ##### Create training/testing set
 * Going to have most recent season be testing set.
 ```{r}
-df_modeling <- final_df %>%
-  select(HomeTeam, AwayTeam, FTR, HTAG, HTHG, HTR, season, HAGG, AAGG, GP, ATP, HTP, HACG, AACG)
-df_train <- df_modeling[which(df_modeling$season != 1819),]
-df_test <- df_modeling[which(df_modeling$season == 1819),]
+df_modeling <- MLS_final
+df_train <- df_modeling[which(df_modeling$Season != 2019),]
+df_test <- df_modeling[which(df_modeling$Season == 2019),]
 cat("Training set contains",nrow(df_train), "rows")
 cat('\n')
 cat("Training set contains",nrow(df_test), "rows")
