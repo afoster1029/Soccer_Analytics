@@ -18,8 +18,8 @@ library(lubridate)
 library(Matrix)
 
 ```
-##### Analyze English Premier League Data with Machine Learning
-#### Research Question: Can we predict the outcome (Home win, Away win or Draw) of the a Premier League match. 
+##### Analyze MLS Data with Machine Learning
+#### Research Question: Can we predict the number of goals each team will score in a match?
 * We intend on using multiple seasons. Our data source (https://datahub.io/sports-data/english-premier-league#data) has data for the past 10 years. 
 * Below we have begun adding explanatory variables and created visualizations for two seasons of matches.
 
