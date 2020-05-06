@@ -1,0 +1,424 @@
+---
+title: "ml_epl"
+author: "Alex Foster, Chris Bajek, Webster An"
+date: "4/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# Load packages
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(reshape2)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(Matrix)
+
+```
+##### Analyze English Premier League Data with Machine Learning
+#### Research Question: Can we predict the outcome (Home win, Away win or Draw) of the a Premier League match. 
+* We intend on using multiple seasons. Our data source (https://datahub.io/sports-data/english-premier-league#data) has data for the past 10 years. 
+* Below we have begun adding explanatory variables and created visualizations for two seasons of matches.
+
+
+#### Load in the data
+```{R}
+MLS <- read_csv("USA.csv")
+
+# create datetime objects using lubridate. 
+# also initialize variables for each game that will measure home/awayteam goals per game and home/away team goals conceded per game
+MLS <- MLS %>%
+  mutate(HAGG = 0.0, AAGG = 0.0, HACG = 0.0, AACG = 0.0, HTP=0, ATP = 0,TG = HG + AG, Datetime = dmy(Date),  month = month(Datetime)) %>%
+  select(Country, League, Season, Datetime, Home, Away, HG, AG, Res, HAGG, AAGG, AACG, HACG,HTP,ATP,TG, PH, PD, PA)
+
+ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Dataset")
+
+```
+
+#### Data Wrangling
+* We created a dataframe where each game in the original dataset is represent in two rows. One row for each team. 
+  * Season -- MLS season that this match occured
+  * Datetime -- lubridate datetime object
+  * Team -- team that the row's statistics belong too
+  * Opponent -- the other team in the match
+  * Goals -- Number of goals the team scored
+  * GoalsAllowed -- Number of goals the opponents scored on the team
+  * Res -- result of the game, 'A'(away), 'H'(home) or 'D'(draw)
+  * AGS -- Average Goals scored per match by the team in matches before this match in a given season 
+  * Position -- Teams position in the league prior to this match
+  * OpPosition -- Opponents position in the league prior to this match
+  * TG -- Total Goals
+  * HA -- 'H' or 'A' indicating if the team is the home team or away team
+  * TableDiff -- Difference in positions between the two teams. 
+  * OpAGC --  Average goals conceded per a match by opponents in matches prior to this one.
+  * GoalScCo -- 
+* Response variable: Goals
+* Explanatory variables: Team, AGS, Position, OpPosition, HA, TableDiff, OpAGC, GoalScCo 
+
+
+```{r, echo=FALSE}
+# Function that computes the table of the season given a certain date in the season.
+# Returns a dataframe that provides stats dependent on the progress of the given season 
+compute_table <- function(date, df=USA) {
+  
+    # Get only the games that are in the same season and occured before the given date. 
+    season = year(date)
+    df_subset <- df[which(df$Season == season & df$Datetime < date), ] # get games from that season and up to the given data
+    
+    
+    # get team names
+    names <- unique(df[which(df$Season==season),]$Home)
+    # initialize beginning of season table (stats are all zero)
+    table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
+  
+    
+    if (nrow(df_subset) != 0){
+        # Loop through each game and update the explanatory varaibles such as GA, GF, GP. All of these values are dependent on the date of the game. 
+        for (row in 1:nrow(df_subset)) {
+            current_r =df_subset[row, ]
+            # Update info for home team
+            home <- current_r$Home
+            table$GA[which(table$Team == home)] <- table$GA[which(table$Team == home)] + current_r$AG# GA
+            table$GF[which(table$Team == home)] <- table$GF[which(table$Team == home)]+current_r$HG# GF
+            table$GP[which(table$Team == home)] <- table$GP[which(table$Team == home)]+1
+            
+            # Update info for away team
+            away <- current_r$Away
+            table$GA[which(table$Team == away)] <- table$GA[which(table$Team == away)]+current_r$HG# GA
+            table$GF[which(table$Team == away)] <- table$GF[which(table$Team == away)]+current_r$AG# GF
+            table$GP[which(table$Team == away)] <- table$GP[which(table$Team == away)]+1
+            
+            # Award points to winner and for ties. 
+            if (current_r$Res == 'H'){ # home wins
+              table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 3
+            } else if (current_r$Res == 'A'){ # away wins
+              table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 3
+            } else { # draw
+              table$Points[which(table$Team == home)] <- table$Points[which(table$Team == home)] + 1
+              table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 1
+            }
+        }
+        
+        # compute goal differential
+        table <- table %>%
+          mutate('GD' = GF - GA)
+        # add AGSG column that represents the avg goals scored per game
+        table <- table %>%
+          mutate(AGSG = GF / GP)
+        # add AGCG column that represents the avg goals conceded per game
+        table <- table %>%
+          mutate(AGCG = GA / GP)
+        # Add position column that indicates what place each team is in. 
+        table <- table[with(table,order(table$Points, table$GD)),]
+        table$Position <- length(names):1
+    }
+  return(table)
+  
+}
+```
+
+```{r, echo=FALSE}
+# Function computes table for every game and updates the current season stats like Avg goals scored, avg goals conceded and position in the league. 
+add_table_stats <- function(df = usa_2012) {
+    for (row in 1:nrow(df)){
+      game = df[row,]
+      # compute table 
+      table <- compute_table(game$Datetime, df)
+      #print(table)
+      
+      # add home/away team average stats based on season performance up to that game.
+      if (table[1,]$GP != 1){ # if games played is 1 then we don't really want average stats (avoids potential errors)
+          
+          if(game$Home %in% table$Team & game$Away %in% table$Team){ # check that both teams are actually in table.
+              # home team stats
+              df[row,]$HAGG <- table$AGSG[which(table$Team == game$Home)]
+              df[row,]$HACG <- table$AGCG[which(table$Team == game$Home)]
+              df[row,]$HTP <- table$Position[which(table$Team == game$Home)]
+              # away teams stats
+              df[row,]$AAGG <- table$AGSG[which(table$Team == game$Away)]
+              df[row,]$AACG <- table$AGCG[which(table$Team == game$Away)]
+              df[row,]$ATP <- table$Position[which(table$Team == game$Away)]
+            
+          }
+     }
+    }
+  
+    return(df)
+}
+```
+ 
+```{r,echo=FALSE}
+# initialize final dataframe with 2012 season
+USA_final <- add_table_stats(MLS[which(MLS$Season==2012),])
+# loop through all other seasons that aren't 2012 and compute season statistics.
+for (season in unique(MLS$Season)){
+  print(season)
+  if (season != 2012){
+    updated_df <- add_table_stats(MLS[which(MLS$Season==season),])
+    USA_final <- rbind(USA_final, updated_df)
+  }
+}
+
+write.csv(USA_final,"USA_final.csv", row.names = TRUE)
+```
+
+```{r}
+# Read in dataset (avoid long code run)
+MLS_df <- read_csv("USA_final.csv",)
+MLS_df <- MLS_df[which(MLS_df$PH != 'USA'),]
+
+```
+##### Putting it all together
+```{r}
+Home <- MLS_df
+Home$Country <- NULL
+Home$League <- NULL
+Home$Date <- NULL
+Home$Time <- NULL
+# Home$Away <- NULL
+Home$AAGG <- NULL
+Home$HACG <- NULL
+Home <- Home %>% 
+  rename(
+    Team = Home,
+    Opponent = Away,
+    Goals = HG,
+    GoalsAllowed = AG,
+    Position = HTP,
+    AGS = HAGG,
+    OpAGC = AACG,
+    OpPosition = ATP
+    )
+Home <- cbind(Home, HA = "H")
+Away <- MLS_df
+Away$Country <- NULL
+Away$League <- NULL
+Away$Date <- NULL
+Away$Time <- NULL
+# Away$Home <- NULL
+Away$HAGG <- NULL
+Away$AACG <- NULL
+Away <- Away %>% 
+  rename(
+    Team = Away,
+    Opponent = Home,
+    Goals = AG,
+    GoalsAllowed = HG,
+    Position = ATP,
+    AGS = AAGG,
+    OpAGC = HACG,
+    OpPosition = HTP,
+    Opponent = Home
+    )
+Away <- cbind(Away, HA = "A")
+MLS_final <- rbind(Home, Away)
+
+MLS_final[1:2, "OpAGC"] = 0
+MLS_final[1:2, "Position"] = 0
+MLS_final[1:2, "OpPosition"] = 0
+MLS_final[409:410, "OpAGC"] = 0
+MLS_final[409:410, "Position"] = 0
+MLS_final[409:410, "OpPosition"] = 0
+MLS_final[,"Position"] <- sapply(MLS_final[, "Position"], as.numeric)
+MLS_final[,"OpPosition"] <- sapply(MLS_final[, "OpPosition"], as.numeric)
+MLS_final[,"AGS"] <- sapply(MLS_final[, "AGS"], as.numeric)
+MLS_final[,"OpAGC"] <- sapply(MLS_final[, "OpAGC"], as.numeric)
+MLS_final <- MLS_final %>%
+  mutate(TableDiff = Position - OpPosition,
+         GoalDiff = Goals - GoalsAllowed,
+         GoalScCo = AGS + OpAGC)
+if ('X1' %in% names(MLS_final)){
+  MLS_df[ , !(names(MLS_df) %in% c('X1'))]
+
+}
+head(MLS_final)
+```
+
+#### Data Visualizations
+
+```{r}
+# Distrbution of full time results by season
+final_df %>% 
+  ggplot(aes(x = FTR)) +
+  geom_bar(colour = "#0c4c8a") +
+  facet_wrap(~season)+
+  theme_minimal()
+
+# Distribution of full time results based on the HTR by season
+final_df %>%
+  ggplot(aes(x = FTR, fill = HTR)) +
+  geom_bar() +
+  scale_fill_hue() +
+  facet_wrap(~season)+
+  theme_minimal()
+
+# Examing goals scored by away and home teams by date and facet by season  
+ggplot(final_df) +
+ aes(x = Datetime, y = FTHG) +
+ geom_line(size = 1L, colour = "#0c4c8a") +
+ theme_minimal() +
+ facet_wrap(~season)
+ggplot(final_df) +
+ aes(x = Datetime, y = FTAG) +
+ geom_line(size = 1L, colour = "#0c4c8a") +
+ theme_minimal() +
+ facet_wrap(vars(season))
+
+# Examine average goals scored as the season progresses
+# final_df %>%
+#   ggplot(aes(x=Datetime, y=HAGG)) +
+#   geom_line() +
+#   facet_wrap(~season)
+# final_df %>%
+#   ggplot(aes(x=Datetime, y=AAGG)) +
+#   geom_line() +
+#   facet_wrap(~season)
+
+```
+
+#### Modeling 
+ 
+
+Predict FTR variable which is either H (home win), A (away win) or D (draw)
+
+##### Create training/testing set
+* Going to have most recent season be testing set.
+```{r}
+df_modeling <- final_df %>%
+  select(HomeTeam, AwayTeam, FTR, HTAG, HTHG, HTR, season, HAGG, AAGG, GP, ATP, HTP, HACG, AACG)
+df_train <- df_modeling[which(df_modeling$season != 1819),]
+df_test <- df_modeling[which(df_modeling$season == 1819),]
+cat("Training set contains",nrow(df_train), "rows")
+cat('\n')
+cat("Training set contains",nrow(df_test), "rows")
+```
+
+
+##### Decision Tree
+
+```{r}
+set.seed(327)
+epl_tree_cp <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rpart",
+  trControl = trainControl(method = "cv",
+                           number = 5),
+  tuneGrid = data.frame(cp = 10^seq(-4, -2 , 
+                                    length = 100)),
+  na.action = na.omit
+)
+```
+
+```{r}
+epl_tree_cp$results
+epl_tree_cp$results %>% 
+  ggplot(aes(x = cp, y = Accuracy)) +
+  geom_line()
+```
+
+*Discussion* The highest accuracy yielded by this decision tree was at 63.95% and it seems to level out at this point. This was reached as the complexity paramter increases towards .01.
+
+```{r}
+confusionMatrix(data = predict(epl_tree_cp, type = "raw"), #predictions
+                reference = df_train$df_1819 , #actuals
+                positive = "A") 
+```
+
+
+#### Bagging 
+
+```{r}
+set.seed(327)
+epl_bagging <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rf",
+  trControl = trainControl(method = "cv",
+                           number = 5),
+  tuneGrid = data.frame(mtry = 16),
+  ntree = 100, #number of trees used, default is 500
+  importance = TRUE, #for importance plots later
+  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+  na.action = na.omit
+)
+```
+
+```{r}
+epl_bagging$results
+plot(epl_bagging$finalModel)
+```
+*Discussion* The accuracy for this bagging model comes out to be ~64.6% slightly higher than the decision tree. 
+
+#### Random Forest
+```{r}
+set.seed(327)
+epl_randf_oob <- train(
+  FTR ~ .,
+  data = df_train, 
+  method = "rf",
+  trControl = trainControl(method = "oob"),
+  tuneGrid = data.frame(mtry = c(2,4,6,8,10,12)),
+  ntree = 200, #number of trees used, default is 500
+  importance = TRUE, #for importance plots later
+  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+  na.action = na.omit
+)
+```
+
+```{r}
+plot(epl_randf_oob$finalModel)
+epl_randf_oob$bestTune
+epl_randf_oob$results$Accuracy[3]
+```
+
+*Discussion* When we tune the random forest out-of-bag model to have the highest accuracy, we find that our model has an accuracy of 65.13%, this is just slightly higher than the previous bagging, and decision tree models. 
+
+```{r}
+ggplot(epl_randf_oob)
+df_train
+vip(epl_randf_oob$finalModel) 
+```
+
+
+#KNN
+
+```{r}
+
+set.seed(327)
+epl_knn <- train(
+  FTR ~., 
+  data = df_train, 
+  method = "knn", 
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                          # summaryFunction = model_stats,
+                           returnResamp = "all"),
+  tuneGrid = data.frame(k = c(1:15)))
+  
+
+epl_knn$results
+epl_knn$bestTune$k
+```
+
+*Discussion* The best tuned KNN model (k = 6) yields an accurac of 62.6% lower than all three previous models. 
+
+#### Lasso Model 
+
+```{r}
+set.seed(253)
+all_vars_mod <- train(
+    FTR ~ .,
+    data = df_train,
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+
+```
+
