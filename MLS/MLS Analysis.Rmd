@@ -64,18 +64,13 @@ ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Datas
 # Function that computes the table of the season given a certain date in the season.
 # Returns a dataframe that provides stats dependent on the progress of the given season 
 compute_table <- function(date, df=USA) {
-  
     # Get only the games that are in the same season and occured before the given date. 
     season = year(date)
     df_subset <- df[which(df$Season == season & df$Datetime < date), ] # get games from that season and up to the given data
-    
-    
     # get team names
     names <- unique(df[which(df$Season==season),]$Home)
     # initialize beginning of season table (stats are all zero)
     table <- data.frame("Team" = names, "Points" = matrix(0,length(names)), "GA" = matrix(0,length(names)), "GF" = matrix(0,length(names)), 'GP' = matrix(0,length(names)))
-  
-    
     if (nrow(df_subset) != 0){
         # Loop through each game and update the explanatory varaibles such as GA, GF, GP. All of these values are dependent on the date of the game. 
         for (row in 1:nrow(df_subset)) {
@@ -102,7 +97,6 @@ compute_table <- function(date, df=USA) {
               table$Points[which(table$Team == away)] <- table$Points[which(table$Team == away)] + 1
             }
         }
-        
         # compute goal differential
         table <- table %>%
           mutate('GD' = GF - GA)
@@ -117,7 +111,6 @@ compute_table <- function(date, df=USA) {
         table$Position <- length(names):1
     }
   return(table)
-  
 }
 ```
 
@@ -128,25 +121,20 @@ add_table_stats <- function(df = usa_2012) {
       game = df[row,]
       # compute table 
       table <- compute_table(game$Datetime, df)
-      #print(table)
-      
-      # add home/away team average stats based on season performance up to that game.
-      if (table[1,]$GP != 1){ # if games played is 1 then we don't really want average stats (avoids potential errors)
-          
-          if(game$Home %in% table$Team & game$Away %in% table$Team){ # check that both teams are actually in table.
-              # home team stats
-              df[row,]$HAGG <- table$AGSG[which(table$Team == game$Home)]
-              df[row,]$HACG <- table$AGCG[which(table$Team == game$Home)]
-              df[row,]$HTP <- table$Position[which(table$Team == game$Home)]
-              # away teams stats
-              df[row,]$AAGG <- table$AGSG[which(table$Team == game$Away)]
-              df[row,]$AACG <- table$AGCG[which(table$Team == game$Away)]
-              df[row,]$ATP <- table$Position[which(table$Team == game$Away)]
-            
-          }
-     }
+        # add home/away team average stats based on season performance up to that game.
+        if (table[1,]$GP != 1){ # if games played is 1 then we don't really want average stats (avoids potential errors)
+            if(game$Home %in% table$Team & game$Away %in% table$Team){ # check that both teams are actually in table.
+                # home team stats
+                df[row,]$HAGG <- table$AGSG[which(table$Team == game$Home)]
+                df[row,]$HACG <- table$AGCG[which(table$Team == game$Home)]
+                df[row,]$HTP <- table$Position[which(table$Team == game$Home)]
+                # away teams stats
+                df[row,]$AAGG <- table$AGSG[which(table$Team == game$Away)]
+                df[row,]$AACG <- table$AGCG[which(table$Team == game$Away)]
+                df[row,]$ATP <- table$Position[which(table$Team == game$Away)]
+            }
+        }
     }
-  
     return(df)
 }
 ```
@@ -166,10 +154,11 @@ for (season in unique(MLS$Season)){
 write.csv(USA_final,"USA_final.csv", row.names = TRUE)
 ```
 
-```{r}
+```{r,echo=FALSE, message=FALSE}
 # Read in dataset (avoid long code run)
 MLS_df <- read_csv("USA_final.csv",)
 MLS_df <- MLS_df[which(MLS_df$PH != 'USA'),]
+MLS_df <- subset(MLS_df,select= -c(X1))
 ```
 ##### Putting it all together
 ```{r}
@@ -216,12 +205,6 @@ Away <- Away %>%
 Away <- cbind(Away, HA = "A")
 MLS_final <- rbind(Home, Away)
 
-MLS_final[1:2, "OpAGC"] = 0
-MLS_final[1:2, "Position"] = 0
-MLS_final[1:2, "OpPosition"] = 0
-MLS_final[409:410, "OpAGC"] = 0
-MLS_final[409:410, "Position"] = 0
-MLS_final[409:410, "OpPosition"] = 0
 MLS_final[,"Position"] <- sapply(MLS_final[, "Position"], as.numeric)
 MLS_final[,"OpPosition"] <- sapply(MLS_final[, "OpPosition"], as.numeric)
 MLS_final[,"AGS"] <- sapply(MLS_final[, "AGS"], as.numeric)
@@ -308,7 +291,7 @@ Predict FTR variable which is either H (home win), A (away win) or D (draw)
 ```{r}
 df_modeling <- MLS_final
 df_train <- df_modeling[which(df_modeling$Season != 2019),]
-df_train <- df_modeling[which(df_train$Season != 2020)] # remove 2020 from training set.
+df_train <- df_modeling[which(df_train$Season != 2020),] # remove 2020 from training set.
 df_test <- df_modeling[which(df_modeling$Season == 2019),]
 cat("Training set contains",nrow(df_train), "rows")
 cat('\n')
