@@ -316,15 +316,14 @@ cat("Training set contains",nrow(df_test), "rows")
 ```
 
 
-#### OLS
-
+##### OLS
 ```{r}
 set.seed(123) 
 split <- trainControl(method = "cv", number = 5)
 
 ols_model <- train(
-  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
-  data = MLS_final,
+  Goals ~ Team + AGS + Position + OpPosition + HA + OpAGC,
+  data = df_train,
   method = "lm", 
   trControl = split,
   na.action = na.omit
@@ -334,32 +333,40 @@ summary(ols_model)
 
 
 
-
-#### Bagging 
-
+##### Stepwise Selection of Variables
 ```{r}
-set.seed(327)
-epl_bagging <- train(
-  FTR ~ .,
-  data = df_train, 
-  method = "rf",
-  trControl = trainControl(method = "cv",
-                           number = 5),
-  tuneGrid = data.frame(mtry = 16),
-  ntree = 100, #number of trees used, default is 500
-  importance = TRUE, #for importance plots later
-  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+set.seed(123) 
+split <- trainControl(method = "cv", number = 5)
+
+cv_cars_all_vars <- train(
+  MPG ~ .,
+  data = cars_train %>% select(-`Model Index`, -Model),
+  method = "leapForward", 
+  tuneGrid = data.frame(nvmax = 1:16), 
+  trControl = split,
   na.action = na.omit
 )
 ```
 
-```{r}
-epl_bagging$results
-plot(epl_bagging$finalModel)
-```
-*Discussion* The accuracy for this bagging model comes out to be ~64.6% slightly higher than the decision tree. 
 
-#### Random Forest
+
+##### Lasso Model 
+```{r}
+set.seed(253)
+all_vars_mod <- train(
+    Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+    data = MLS_final,
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+
+```
+
+
+##### Random Forest
 ```{r}
 set.seed(327)
 epl_randf_oob <- train(
@@ -390,7 +397,7 @@ vip(epl_randf_oob$finalModel)
 ```
 
 
-#KNN
+##### KNN
 
 ```{r}
 
@@ -412,19 +419,4 @@ epl_knn$bestTune$k
 
 *Discussion* The best tuned KNN model (k = 6) yields an accurac of 62.6% lower than all three previous models. 
 
-#### Lasso Model 
-
-```{r}
-set.seed(253)
-all_vars_mod <- train(
-    FTR ~ .,
-    data = df_train,
-    method = "glm",
-    family = "binomial",
-    trControl = trainControl(method = "cv", number = 5),
-    metric = "Accuracy",
-    na.action = na.omit
-)
-
-```
 
