@@ -239,7 +239,9 @@ MLS_final %>%
   ggplot(aes(x = Goals)) +
   geom_bar(colour = "#0c4c8a") +
   facet_wrap(~Season)+
-  theme_minimal()
+  theme_minimal() +
+  ggtitle("Goals by Season (Broken in to Months)") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 # Distribution of full time results  by season
 MLS_final %>%
@@ -247,44 +249,47 @@ MLS_final %>%
   geom_bar() +
   scale_fill_hue() +
   facet_wrap(~Season)+
-  theme_minimal()
+  theme_minimal() +
+  ggtitle("Full Time Results by Season") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 # Examining average goals scored
 MLS_final %>%
-  ggplot(aes(x = Team, y = AGS)) +
+  group_by(Team) %>% 
+  mutate(avg_goals=AGS/n()) %>% 
+  ggplot(aes(x = Team, y = avg_goals)) +
   geom_col() +
   scale_fill_hue() +
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  ylab("Average Goals per Game") +
+  ggtitle("Average Goals by Team") +
+  theme(plot.title = element_text(hjust = 0.5))
 
-# Examing goals scored by away and home teams by date and facet by season  
+# Examining relationship between AGS and Position by team
 MLS_final %>% 
-  ggplot() +
- aes(x = Datetime, y = FTHG) +
- geom_line(size = 1L, colour = "#0c4c8a") +
- theme_minimal() +
- facet_wrap(~Season)
-ggplot(final_df) +
- aes(x = Datetime, y = FTAG) +
- geom_line(size = 1L, colour = "#0c4c8a") +
- theme_minimal() +
- facet_wrap(vars(season))
+  ggplot(aes(x=AGS, y=Position)) +
+  geom_point(alpha=.5) +
+  scale_fill_hue() +
+  facet_wrap(~Team)+
+  theme_minimal() +
+  ggtitle("Average Goals by Table Position") +
+  theme(plot.title = element_text(hjust = 0.5))
 
-# Examine average goals scored as the season progresses
-# final_df %>%
-#   ggplot(aes(x=Datetime, y=HAGG)) +
-#   geom_line() +
-#   facet_wrap(~season)
-# final_df %>%
-#   ggplot(aes(x=Datetime, y=AAGG)) +
-#   geom_line() +
-#   facet_wrap(~season)
-
+# Number of goals scored by team during home games or away games
+MLS_final %>% 
+  ggplot(aes(x=HA, y=Goals)) +
+  geom_col() +
+  scale_fill_hue() +
+  facet_wrap(~Team)+
+  theme_minimal() +
+  ggtitle("Total Goals Scored at Home and Away") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 #### Modeling 
  
 
-Predict FTR variable which is either H (home win), A (away win) or D (draw)
+Predict Goals variable
 
 ##### Create training/testing set
 * Going to have most recent season be testing set.
