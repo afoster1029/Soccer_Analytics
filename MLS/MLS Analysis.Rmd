@@ -288,6 +288,7 @@ Predict FTR variable which is either H (home win), A (away win) or D (draw)
 ```{r}
 df_modeling <- MLS_final
 df_train <- df_modeling[which(df_modeling$Season != 2019),]
+df_train <- df_modeling[which(df_train$Season != 2020)] # remove 2020 from training set.
 df_test <- df_modeling[which(df_modeling$Season == 2019),]
 cat("Training set contains",nrow(df_train), "rows")
 cat('\n')
