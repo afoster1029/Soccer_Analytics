@@ -245,7 +245,12 @@ MLS_final %>%
   theme_minimal() +
   ggtitle("Goals by Season (Broken in to Months)") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+*Discussion* 
 
+
+
+```{r}
 # Distribution of full time results  by season
 MLS_final %>%
   ggplot(aes(x = Res)) +
@@ -255,7 +260,12 @@ MLS_final %>%
   theme_minimal() +
   ggtitle("Full Time Results by Season") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+*Discussion* 
 
+
+
+```{r}
 # Total Goals by team
 MLS_final %>%
   ggplot(aes(x = Team, y = Goals)) +
@@ -264,7 +274,12 @@ MLS_final %>%
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
   ggtitle("Total Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+*Discussion* 
 
+
+
+```{r}
 # Examining average goals scored
 MLS_final %>%
   group_by(Team) %>% 
@@ -276,7 +291,12 @@ MLS_final %>%
   ylab("Average Goals per Game") +
   ggtitle("Average Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+*Discussion* 
 
+
+
+```{r}
 # Examining relationship between AGS and Position by team
 MLS_final %>% 
   ggplot(aes(x=AGS, y=Position)) +
@@ -286,7 +306,12 @@ MLS_final %>%
   theme_minimal() +
   ggtitle("Average Goals by Table Position") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+*Discussion* 
 
+
+
+```{r}
 # Number of goals scored by team during home games or away games
 MLS_final %>% 
   ggplot(aes(x=HA, y=Goals)) +
@@ -330,7 +355,7 @@ ols_model <- train(
 )
 summary(ols_model)
 ```
-
+*Discussion*
 
 
 ##### Stepwise Selection of Variables
