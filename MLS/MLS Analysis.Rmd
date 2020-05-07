@@ -55,11 +55,7 @@ ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Datas
   * HA -- 'H' or 'A' indicating if the team is the home team or away team
   * TableDiff -- Difference in positions between the two teams. 
   * OpAGC --  Average goals conceded per a match by opponents in matches prior to this one.
-<<<<<<< HEAD
-  * GoalScCo -- ??
-=======
   * GoalScCo -- The sum of AGS and OpAGC
->>>>>>> 547703f0d884e698dfb7371a1ba0da61cb7e7c16
 * Response variable: Goals
 * Explanatory variables: Team, AGS, Position, OpPosition, HA, TableDiff, OpAGC, GoalScCo 
 
