@@ -17,6 +17,9 @@ library(readr)
 library(lubridate)
 library(Matrix)
 library(DataCombine)
+library(rsample)
+library(caret)
+library(broom)
 
 ```
 ##### Analyze MLS Data with Machine Learning
@@ -289,7 +292,7 @@ MLS_final %>%
 #### Modeling 
  
 
-Predict Goals variable
+Predict Goals Variable
 
 ##### Create training/testing set
 * Going to have most recent season be testing set.
@@ -304,36 +307,23 @@ cat("Training set contains",nrow(df_test), "rows")
 ```
 
 
-##### Decision Tree
+#### OLS
 
 ```{r}
-set.seed(327)
-epl_tree_cp <- train(
-  FTR ~ .,
-  data = df_train, 
-  method = "rpart",
-  trControl = trainControl(method = "cv",
-                           number = 5),
-  tuneGrid = data.frame(cp = 10^seq(-4, -2 , 
-                                    length = 100)),
+set.seed(123) 
+split <- trainControl(method = "cv", number = 5)
+
+ols_model <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = MLS_final,
+  method = "lm", 
+  trControl = split,
   na.action = na.omit
 )
+summary(ols_model)
 ```
 
-```{r}
-epl_tree_cp$results
-epl_tree_cp$results %>% 
-  ggplot(aes(x = cp, y = Accuracy)) +
-  geom_line()
-```
 
-*Discussion* The highest accuracy yielded by this decision tree was at 63.95% and it seems to level out at this point. This was reached as the complexity paramter increases towards .01.
-
-```{r}
-confusionMatrix(data = predict(epl_tree_cp, type = "raw"), #predictions
-                reference = df_train$df_1819 , #actuals
-                positive = "A") 
-```
 
 
 #### Bagging 
