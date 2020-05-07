@@ -256,6 +256,15 @@ MLS_final %>%
   ggtitle("Full Time Results by Season") +
   theme(plot.title = element_text(hjust = 0.5))
 
+# Total Goals by team
+MLS_final %>%
+  ggplot(aes(x = Team, y = Goals)) +
+  geom_col() +
+  scale_fill_hue() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  ggtitle("Total Goals by Team") +
+  theme(plot.title = element_text(hjust = 0.5))
+
 # Examining average goals scored
 MLS_final %>%
   group_by(Team) %>% 
