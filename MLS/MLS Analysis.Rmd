@@ -1,5 +1,5 @@
 ---
-title: "ml_epl"
+title: "Final Project MLS"
 author: "Alex Foster, Chris Bajek, Webster An"
 date: "4/23/2020"
 output: html_document
@@ -16,6 +16,7 @@ library(tidyr)
 library(readr)
 library(lubridate)
 library(Matrix)
+library(DataCombine)
 
 ```
 ##### Analyze MLS Data with Machine Learning
@@ -39,7 +40,7 @@ ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Datas
 ```
 
 #### Data Wrangling
-* We created a dataframe where each game in the original dataset is represent in two rows. One row for each team. 
+* We created a dataframe where each game in the original dataset is represented in two rows. One row for each team. 
   * Season -- MLS season that this match occured
   * Datetime -- lubridate datetime object
   * Team -- team that the row's statistics belong too
@@ -54,7 +55,11 @@ ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Datas
   * HA -- 'H' or 'A' indicating if the team is the home team or away team
   * TableDiff -- Difference in positions between the two teams. 
   * OpAGC --  Average goals conceded per a match by opponents in matches prior to this one.
-  * GoalScCo -- 
+<<<<<<< HEAD
+  * GoalScCo -- ??
+=======
+  * GoalScCo -- The sum of AGS and OpAGC
+>>>>>>> 547703f0d884e698dfb7371a1ba0da61cb7e7c16
 * Response variable: Goals
 * Explanatory variables: Team, AGS, Position, OpPosition, HA, TableDiff, OpAGC, GoalScCo 
 
@@ -233,33 +238,52 @@ if ('X1' %in% names(MLS_final)){
   MLS_df[ , !(names(MLS_df) %in% c('X1'))]
 
 }
+
+#Accounting for the fact that Atlanta United has two different names "Atlanta United" and "Atlanta Utd"
+
+# Create replacements data frame
+Replaces <- data.frame(from = "Atlanta Utd", to = "Atlanta United")
+
+# Replace patterns and return full data frame
+MLS_final1 <- FindReplace(data = MLS_final, Var = "Team", replaceData = Replaces,
+                     from = "from", to = "to", exact = FALSE)
+MLS_final <- MLS_final1
+remove(MLS_final1)
 head(MLS_final)
 ```
 
 #### Data Visualizations
 
 ```{r}
-# Distrbution of full time results by season
-final_df %>% 
-  ggplot(aes(x = FTR)) +
+# Distrbution of goals by season (broken into months)
+MLS_final %>% 
+  ggplot(aes(x = Goals)) +
   geom_bar(colour = "#0c4c8a") +
-  facet_wrap(~season)+
+  facet_wrap(~Season)+
   theme_minimal()
 
-# Distribution of full time results based on the HTR by season
-final_df %>%
-  ggplot(aes(x = FTR, fill = HTR)) +
+# Distribution of full time results  by season
+MLS_final %>%
+  ggplot(aes(x = Res)) +
   geom_bar() +
   scale_fill_hue() +
-  facet_wrap(~season)+
+  facet_wrap(~Season)+
   theme_minimal()
 
+# Examining average goals scored
+MLS_final %>%
+  ggplot(aes(x = Team, y = AGS)) +
+  geom_col() +
+  scale_fill_hue() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
 # Examing goals scored by away and home teams by date and facet by season  
-ggplot(final_df) +
+MLS_final %>% 
+  ggplot() +
  aes(x = Datetime, y = FTHG) +
  geom_line(size = 1L, colour = "#0c4c8a") +
  theme_minimal() +
- facet_wrap(~season)
+ facet_wrap(~Season)
 ggplot(final_df) +
  aes(x = Datetime, y = FTAG) +
  geom_line(size = 1L, colour = "#0c4c8a") +
@@ -288,6 +312,7 @@ Predict FTR variable which is either H (home win), A (away win) or D (draw)
 ```{r}
 df_modeling <- MLS_final
 df_train <- df_modeling[which(df_modeling$Season != 2019),]
+df_train <- df_modeling[which(df_train$Season != 2020)] # remove 2020 from training set.
 df_test <- df_modeling[which(df_modeling$Season == 2019),]
 cat("Training set contains",nrow(df_train), "rows")
 cat('\n')
