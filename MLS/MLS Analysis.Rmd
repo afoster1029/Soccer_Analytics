@@ -326,6 +326,7 @@ MLS_final %>%
   ggtitle("Total Goals Scored at Home and Away") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+*Discussion*
 
 #### Modeling 
  
