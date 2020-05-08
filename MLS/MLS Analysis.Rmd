@@ -345,22 +345,6 @@ cat("Training set contains",nrow(df_test), "rows")
 ```
 
 
-##### OLS
-```{r}
-set.seed(123) 
-split <- trainControl(method = "cv", number = 5)
-
-ols_model <- train(
-  Goals ~ Team + AGS + Position + OpPosition + HA + OpAGC,
-  data = df_train,
-  method = "lm", 
-  trControl = split,
-  na.action = na.omit
-)
-summary(ols_model)
-```
-*Discussion*
-
 
 ##### Stepwise Selection of Variables
 ```{r}
@@ -380,6 +364,7 @@ cv_MLS_all_vars$results
 cv_MLS_all_vars$bestTune
 tidy(coef(cv_MLS_all_vars$finalModel,id=60))
 ```
+
 ```{r}
 cv_MLS_all_vars$results %>% 
   ggplot() +
@@ -390,10 +375,31 @@ cv_MLS_all_vars$results %>%
 
 
 
+##### OLS
+```{r}
+set.seed(123) 
+split <- trainControl(method = "cv", number = 5)
+
+ols_model <- train(
+  Goals ~ Team + Opponent + GoalsAllowed,
+  data = df_train,
+  method = "lm", 
+  trControl = split,
+  na.action = na.omit
+)
+summary(ols_model)
+```
+*Discussion*
+
+
+
+
+
+
 ##### Lasso Model 
 ```{r}
 set.seed(253)
-all_vars_mod <- train(
+MLS_Lasso <- train(
     Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
     data = MLS_final,
     method = "glm",
