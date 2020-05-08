@@ -221,7 +221,7 @@ if ('X1' %in% names(MLS_final)){
 
 }
 
-#Accounting for the fact that Atlanta United has two different names "Atlanta United" and "Atlanta Utd"
+# Accounting for the fact that Atlanta United has two different names "Atlanta United" and "Atlanta Utd"
 
 # Create replacements data frame
 Replaces <- data.frame(from = "Atlanta Utd", to = "Atlanta United")
@@ -231,6 +231,10 @@ MLS_final1 <- FindReplace(data = MLS_final, Var = "Team", replaceData = Replaces
                      from = "from", to = "to", exact = FALSE)
 MLS_final <- MLS_final1
 remove(MLS_final1)
+MLS_final <- MLS_final %>% 
+  mutate(`PH` = as.numeric(`PH`)) %>% 
+  mutate(`PD` = as.numeric(`PD`)) %>% 
+  mutate(`PA`= as.numeric(`PA`))
 head(MLS_final)
 ```
 
@@ -338,14 +342,25 @@ summary(ols_model)
 set.seed(123) 
 split <- trainControl(method = "cv", number = 5)
 
-cv_cars_all_vars <- train(
-  MPG ~ .,
-  data = cars_train %>% select(-`Model Index`, -Model),
+cv_MLS_all_vars <- train(
+  Goals ~ .,
+  data = df_train %>% select(-Datetime, -Season, -Res, -TG),
   method = "leapForward", 
-  tuneGrid = data.frame(nvmax = 1:16), 
+  tuneGrid = data.frame(nvmax = 1:61), 
   trControl = split,
   na.action = na.omit
 )
+
+cv_MLS_all_vars$results
+cv_MLS_all_vars$bestTune
+tidy(coef(cv_MLS_all_vars$finalModel,id=60))
+```
+```{r}
+cv_MLS_all_vars$results %>% 
+  ggplot() +
+  geom_line(aes(x=nvmax,y=RMSE),color="blue") +
+  geom_line(aes(x=nvmax,y=RMSE + RMSESD)) +
+  geom_line(aes(x=nvmax,y=RMSE - RMSESD))
 ```
 
 
@@ -366,35 +381,6 @@ all_vars_mod <- train(
 ```
 
 
-##### Random Forest
-```{r}
-set.seed(327)
-epl_randf_oob <- train(
-  FTR ~ .,
-  data = df_train, 
-  method = "rf",
-  trControl = trainControl(method = "oob"),
-  tuneGrid = data.frame(mtry = c(2,4,6,8,10,12)),
-  ntree = 200, #number of trees used, default is 500
-  importance = TRUE, #for importance plots later
-  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
-  na.action = na.omit
-)
-```
-
-```{r}
-plot(epl_randf_oob$finalModel)
-epl_randf_oob$bestTune
-epl_randf_oob$results$Accuracy[3]
-```
-
-*Discussion* When we tune the random forest out-of-bag model to have the highest accuracy, we find that our model has an accuracy of 65.13%, this is just slightly higher than the previous bagging, and decision tree models. 
-
-```{r}
-ggplot(epl_randf_oob)
-df_train
-vip(epl_randf_oob$finalModel) 
-```
 
 
 ##### KNN
