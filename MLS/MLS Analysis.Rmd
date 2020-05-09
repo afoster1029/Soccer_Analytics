@@ -3,10 +3,12 @@ title: "Final Project MLS"
 author: "Alex Foster, Chris Bajek, Webster An"
 date: "4/23/2020"
 output: html_document
+abstract: "Predicting the outcome or different statistics of sports is a massive market for betting and gambling. Additionally, in crisis such as a global pandemic, predicting results can be crucial for determining how the season would have ended. For this project, we will use different machine learning techniques that we learned in Statistical Machine Learning to determine how to predict the outcome of matches in the Major Socceer League. Using data on the MLS season from 2012-2019 we hope to predict the results of some of the intial matches of the 2020 season."
+
 ---
 
 ```{r setup, include=FALSE}
-
+knitr::opts_chunk$set(echo = TRUE)
 # Load packages
 library(ggplot2)
 library(dplyr)
@@ -22,14 +24,17 @@ library(caret)
 library(broom)
 
 ```
-##### Analyze MLS Data with Machine Learning
-#### Research Question: Can we predict the number of goals each team will score in a match?
-* We intend on using multiple seasons. Our data source has data for the past 8 years. 
-* Below we have begun adding explanatory variables and created visualizations for two seasons of matches.
 
+## Introduction
 
-#### Load in the data
-```{R}
+Due to the COVID-19 pandemic in 2020, the majority sport leagues across the world have halted their seasons. This has lead to varying decisions of how to proceed. Since soccer does not have playoffs, the final standings of the league dictate which teams are promoted or relegated. This can have a massive finicial effect on teams in relegation and promotion positions. Some leagues have decided to cancel the rest of the remaining season, while other leagues, like France's Ligue 1, have decided to end the league as it stands, crowning the current 1st place team. This decision has resulted in several lawsuits. 
+
+In the USA, the Major League Soccer does not implement promotion or relegation and uses the playoff system like many other American sports leagues. However, due to the chaoes in European soccer leagues, we wanted to see if we could create a model that could predict the outcome of MLS matches. We intend to do this by predicting the number of goals each team will play in a match and compute the result based on thsoe predictions. 
+
+## Data 
+
+```{R,echo=FALSE}
+unique(MLS$Season)
 MLS <- read_csv("USA.csv")
 
 # create datetime objects using lubridate. 
@@ -38,31 +43,39 @@ MLS <- MLS %>%
   mutate(HAGG = 0.0, AAGG = 0.0, HACG = 0.0, AACG = 0.0, HTP=0, ATP = 0,TG = HG + AG, Datetime = dmy(Date),  month = month(Datetime)) %>%
   select(Country, League, Season, Datetime, Home, Away, HG, AG, Res, HAGG, AAGG, AACG, HACG,HTP,ATP,TG, PH, PD, PA)
 
-ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Dataset")
-
 ```
 
-#### Data Wrangling
-* We created a dataframe where each game in the original dataset is represented in two rows. One row for each team. 
-  * Season -- MLS season that this match occured
-  * Datetime -- lubridate datetime object
-  * Team -- team that the row's statistics belong too
-  * Opponent -- the other team in the match
-  * Goals -- Number of goals the team scored
-  * GoalsAllowed -- Number of goals the opponents scored on the team
-  * Res -- result of the game, 'A'(away), 'H'(home) or 'D'(draw)
-  * AGS -- Average Goals scored per match by the team in matches before this match in a given season 
-  * Position -- Teams position in the league prior to this match
-  * OpPosition -- Opponents position in the league prior to this match
-  * TG -- Total Goals
-  * HA -- 'H' or 'A' indicating if the team is the home team or away team
-  * TableDiff -- Difference in positions between the two teams. 
-  * OpAGC --  Average goals conceded per a match by opponents in matches prior to this one.
-  * GoalScCo -- The sum of AGS and OpAGC
-* Response variable: Goals
-* Explanatory variables: Team, AGS, Position, OpPosition, HA, TableDiff, OpAGC, GoalScCo 
+The dataset that we used provides brief overall match statistics of all MLS matches from 2012-2020. The dataset was provided by http://www.football-data.co.uk/usa.php, which is used primarily to compute betting odds. As a result our dataset contains not only the relevant match information but also the betting odds for each potential result. Since 2012 there have been 2794 matches. The graph below represents the number of number of matches for each season. The increase of matches in each year is due to the constant expansion in the MLS. This means that in each new season there are brand new teams with no previous match data. 
 
+```{r}
+ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Dataset")
+```
 
+The initial dataset provided us with the outcome and date of each match, teams playing, number of goals scored by each team and betting odds. We recognized that we would need more explanatory variables. We created a function that would compute the league table prior to a given date. This allowed us to compute each teams average goals scored per game, average goals conceded per game for each match and their position in the league. However, even with our additional explanatory variables we wrangled our dataset to be better designed for predictive modeling. We split each match into two rows. This meant that each row represented a team with that teams relevant information. Ultimately our dataset had the the following structure. 
+
+<table style="border:2px solid black;margin-left:auto;margin-right:auto;">
+<tr> <th>  </th> <th> Variable Name </th> <th> Description </th>  </tr>
+  <tr> <td align="center"> 3 </td> <td align="center"> Season </td> <td align="center"> Calendar year that a given season occurred (2012 - 2020) </td> </tr>
+  <tr> <td align="center"> 4 </td> <td align="center"> Datetime </td> <td align="center"> Represents the date the match was played on (lubridate datetime object) </td> </tr>
+  <tr> <td align="center"> 5 </td> <td align="center"> Team </td> <td align="center"> Team that we will predict number of goals for. </td> </tr>
+  <tr> <td align="center"> 6 </td> <td align="center"> Opponent </td> <td align="center"> Team's opponent for given match </td> </tr>
+  <tr> <td align="center"> 7 </td> <td align="center"> Goals </td> <td align="center"> Team's goals scored in the given match </td> </tr>
+  <tr> <td align="center"> 8 </td> <td align="center"> GoalsAllowed </td> <td align="center"> Opponent goals scored in the given match </td> </tr>
+  <tr> <td align="center"> 9 </td> <td align="center"> Res </td> <td align="center"> Final result of the match (H/A/T) </td> </tr>
+  <tr> <td align="center"> 10 </td> <td align="center"> AGS </td> <td align="center"> Team's average goals per game prior to this match </td> </tr>
+  <tr> <td align="right"> 11 </td> <td align="center"> OpAGC </td> <td align="center"> Oppoent's average goals conceded per game prior to this match </td> </tr>
+  <tr> <td align="right"> 12 </td> <td align="center"> Position </td> <td align="center">  Team's league position prior to this match </td> </tr>
+  <tr> <td align="right"> 13 </td> <td align="center"> OpPosition </td> <td align="center"> Oppoent's league position prior to this match </td> </tr>
+  <tr> <td align="right"> 14 </td> <td align="center"> TG </td> <td align="center"> Total goals scored in this match </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> TableDiff </td> <td align="center"> Team's difference in table position with opponent </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> GoalDiff </td> <td align="center"> Team's goal differential prior to this match </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> GoalScCo </td> <td align="center"> The sum of AGS and OpAGC variables </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> HA </td> <td align="center"> Dictates whether the Team is home or away for the given match </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> PH </td> <td align="center"> Betting odds of a home win </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> PD </td> <td align="center"> Betting odds of a draw </td> </tr>
+  <tr> <td align="right"> 15 </td> <td align="center"> PA </td> <td align="center"> Betting odds of an away win </td> </tr>
+   </table>
+   
 ```{r, echo=FALSE}
 # Function that computes the table of the season given a certain date in the season.
 # Returns a dataframe that provides stats dependent on the progress of the given season 
@@ -328,10 +341,7 @@ MLS_final %>%
 ```
 *Discussion*
 
-#### Modeling 
- 
-
-Predict Goals Variable
+#### Modeling: Predict Goals Variable
 
 ##### Create training/testing set
 * Going to have most recent season be testing set.
@@ -406,7 +416,7 @@ MLS_Lasso <- train(
     method = "glm",
     family = "binomial",
     trControl = trainControl(method = "cv", number = 5),
-    metric = "Accuracy",
+    #metric = "Accuracy",
     na.action = na.omit
 )
 
