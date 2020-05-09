@@ -1,0 +1,14 @@
+base
+ggplot2
+dplyr
+janitor
+reshape2
+tidyr
+readr
+lubridate
+Matrix
+DataCombine
+rsample
+lattice
+caret
+broom
