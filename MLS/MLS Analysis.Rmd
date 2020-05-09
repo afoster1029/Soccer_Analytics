@@ -21,6 +21,34 @@ library(rsample)
 library(caret)
 library(broom)
 
+#plotting and exploring
+library(tidyverse) #for plotting and summarizing
+library(GGally) #for nice scatterplot matrix 
+library(ggridges) #for joy/ridge plots
+library(corrplot) #for basic correlation matrix plot
+library(naniar) #for exploring missing values
+library(pdp) #for partial dependence plots, MARS models
+
+#making things look nice
+library(knitr) #for nice tables
+library(scales) #for nice labels on graphs
+library(gridExtra) #for arranging plots
+library(broom) #for nice model output
+
+#data
+library(ISLR) #for data
+library(moderndive) #for data
+
+#modeling
+library(rsample) #for splitting data
+library(recipes) #for keeping track of any transformations we do
+library(caret) #for modeling
+library(leaps) #for variable selection
+library(glmnet) #for LASSO
+library(earth) #for MARS models
+library(vip) #NEW for importance plots
+library(rpart.plot)
+
 ```
 ##### Analyze MLS Data with Machine Learning
 #### Research Question: Can we predict the number of goals each team will score in a match?
@@ -250,7 +278,7 @@ MLS_final %>%
   ggtitle("Goals by Season (Broken in to Months)") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
+*The visualization above shows the total number of goals scored by all teams over the months in which a season is played for each season in the data set. One can observe that the first few months have the highest amount of total goals because these are the months in which there is highest concentration of games.* 
 
 
 
@@ -265,7 +293,7 @@ MLS_final %>%
   ggtitle("Full Time Results by Season") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
+*The graph above depicts full time results as an Away Win (A), Draw (D), or Home Win (H). As we expect the most common result is a home win, seeming to prove that there is such a thing as home field advantage.* 
 
 
 
@@ -279,7 +307,7 @@ MLS_final %>%
   ggtitle("Total Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
+*This plot shows the total number of goals scored by individual teams in the MLS. Total number of goals can be misleading though because some of the teams are much newer than others and haven't had an opportunity to score goals in all of the seasons in our data.* 
 
 
 
@@ -296,7 +324,7 @@ MLS_final %>%
   ggtitle("Average Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
+*This plot is similar to the previous one except that it examines the average goals scored per game by each team. The Miami team and the Nashville team were just added to the league so it makes sense that they have little to no goal information.* 
 
 
 
@@ -311,7 +339,7 @@ MLS_final %>%
   ggtitle("Average Goals by Table Position") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
+*The plots above show how the average number of goals relates to a teams position in the MLS table. The lower the position on the y-axis the better a team is doing (being 4th in the table is better than 24th). Generally it looks like the trend is that a higher number of average goals means a better position in the table.* 
 
 
 
@@ -326,7 +354,7 @@ MLS_final %>%
   ggtitle("Total Goals Scored at Home and Away") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion*
+*The plot above shows the number of home and away goals each team has scored over the seasons our data includes. Like the results graph show previously, we expect there to be a homefield advantage and this plot shows there is.* 
 
 #### Modeling 
  
@@ -399,42 +427,183 @@ summary(ols_model)
 
 ##### Lasso Model 
 ```{r}
-set.seed(253)
-MLS_Lasso <- train(
-    Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
-    data = MLS_final,
-    method = "glm",
-    family = "binomial",
-    trControl = trainControl(method = "cv", number = 5),
-    metric = "Accuracy",
-    na.action = na.omit
+
+model_stats <- function(data, lev = NULL, model = NULL) {
+  
+  stats <- defaultSummary(data, lev = lev, model = model)
+  
+  transf_rmse <- function (pred, obs) {
+    sqrt(mean((exp(obs) - exp(pred))^2))
+  }
+  
+  trmse <- transf_rmse(pred = data$pred,
+                       obs = data$obs)
+  c(tRMSE = trmse, stats)
+}
+
+lambda_grid <- 10^seq(-4, -1 , length = 50)
+#Credit for Model_stats code goes to Lisa Lendway. 
+
+set.seed(327)
+MLS_lasso <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = df_train, 
+  method = "glmnet",
+  tuneGrid = data.frame(alpha = 1, lambda = lambda_grid),
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all",
+                           selectionFunction = "best"),
+  na.action = na.omit,
+  metric = "RMSE", 
+  maximize = FALSE
 )
+
+MLS_lasso$results
+MLS_lasso$bestTune
+MLS_lasso$results$RMSE[1]
+
+set.seed(327)
+MLS_lasso_small <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = df_train, 
+  method = "glmnet",
+  tuneGrid = data.frame(alpha = 1, lambda = lambda_grid),
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all",
+                           selectionFunction = "oneSE"),
+  na.action = na.omit,
+  metric = "RMSE", 
+  maximize = FALSE
+)
+
+MLS_lasso_small$results
+MLS_lasso_small$bestTune
+MLS_lasso_small$results$RMSE[47]
+best_lambda_small <- MLS_lasso_small$bestTune$lambda
+coefficients(MLS_lasso_small$finalModel, s = best_lambda_small)
+
+set.seed(327)
+MLS_lasso_small_test <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = df_test, 
+  method = "glmnet",
+  tuneGrid = data.frame(alpha = 1, lambda = lambda_grid),
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all",
+                           selectionFunction = "oneSE"),
+  na.action = na.omit,
+  metric = "tRMSE", 
+  maximize = FALSE
+)
+
+MLS_lasso_small_test$results
+coefficients(MLS_lasso_small_test$finalModel, s = best_lambda_small)
+```
+*Discussion* We chose to run two lasso models, one normal lasso model, and one tuned to be the smallest model (the model with largest lambda within one standard error of the best models). Our first model produced an RMSE of 1.174427 and the smaller lasso model had an RMSE of 1.183064. Both of these values are similar to the OLS model, and higher than the Stepwise-Selection RMSE. 
+
+If we examine the coefficients of the smallest model, only 4 terms remain, the largest coefficient being for GoalScCo = 0.029404969. 
+
+#MARS MLS Model
+
+```{r}
+set.seed(327)
+
+MLS_mars <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = df_train, 
+  method = "earth",
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all"),
+                           na.action = na.exclude,
+                          
+                          
+  tuneGrid = data.frame(degree = 1, nprune = 2:8)
+)
+
+MLS_mars_best <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
+  data = df_train, 
+  method = "earth",
+  #tuneGrid = data.frame(alpha = 1, lambda = lambda_grid),
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all",
+                           selectionFunction = "best"),
+                           na.action = na.exclude,
+  
+  
+  tuneGrid = data.frame(degree = 1, nprune = 2:8)
+ 
+)
+MLS_mars$results
+MLS_mars_best$results
+
+
+partial(MLS_mars, pred.var = "GoalScCo", grid.resolution = 50) %>%
+  autoplot() 
+
+partial(MLS_mars, pred.var = "HA", grid.resolution = 50) %>%
+  autoplot() 
+```
+*Discussion* The output of our Mars models yielded similar results to our previous models. The lowest RMSE of our models occured for both of them at the 4th prune, corresponding to an RMSE of 1.178. The partial dependence plot of GoalScCo indicates a linear relationship between Goals and this variable which is the sum of AGS and OpAGC. 
+
+#MLS Regression Tree
+
+```{r}
+set.seed(327)
+
+house_tree <- train(
+  mod_rec,
+  data = df_train, 
+  method = "rpart",
+  trControl = trainControl(method = "cv",
+                           number = 5,
+                           summaryFunction = model_stats,
+                           returnResamp = "all"),
+  na.action = na.exclude,
+  tuneGrid = data.frame(cp = 10^seq(-4, -2 , length = 20))
+)
+
+house_tree$results
 
 ```
 
-
-
-
-##### KNN
+#KNN MLS Model
 
 ```{r}
-
 set.seed(327)
-epl_knn <- train(
-  FTR ~., 
+MLS_knn <- train(
+  Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo, 
   data = df_train, 
   method = "knn", 
   trControl = trainControl(method = "cv",
                            number = 5,
-                          # summaryFunction = model_stats,
+                           summaryFunction = model_stats,
                            returnResamp = "all"),
-  tuneGrid = data.frame(k = c(1:15)))
+  na.action = na.exclude,
+  tuneGrid = data.frame(k = c(1:30)))
   
 
-epl_knn$results
-epl_knn$bestTune$k
+MLS_knn$results
+MLS_knn$bestTune$k
+
+MLS_knn$results %>%
+  mutate(RMSESE = RMSESD/sqrt(5)) %>%
+  select(k,RMSE,RMSESE) %>%
+  ggplot(aes(x=k, y=RMSE)) +
+  geom_point() +
+  geom_pointrange(aes(ymin=RMSE+RMSESE, ymax=RMSE-RMSESE)) +
+  geom_line(aes(x=k, y=RMSE), color = "#0c4c8a") +
+  geom_hline(yintercept = 1.235700 + 0.02363899, color = "black")
 ```
-
-*Discussion* The best tuned KNN model (k = 6) yields an accurac of 62.6% lower than all three previous models. 
-
-
+*Discussion* 
+When we run a KNN model the lowest RMSE, 1.2357, can be observed when k = 15. If we take a look at the the best tune parameter, this confirms that k = 15. However, there could be an argument for a model in which k = 10, as this is the simplest model within one RMSE standard error of k = 15. 
