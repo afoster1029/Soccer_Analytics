@@ -411,7 +411,7 @@ cv_MLS_all_vars$results %>%
   geom_line(aes(x=nvmax,y=RMSE + RMSESD)) +
   geom_line(aes(x=nvmax,y=RMSE - RMSESD))
 ```
-
+*Discussion*
 
 
 #### OLS
@@ -563,27 +563,6 @@ partial(MLS_mars, pred.var = "HA", grid.resolution = 50) %>%
   autoplot() 
 ```
 *Discussion* The output of our Mars models yielded similar results to our previous models. The lowest RMSE of our models occured for both of them at the 4th prune, corresponding to an RMSE of 1.178. The partial dependence plot of GoalScCo indicates a linear relationship between Goals and this variable which is the sum of AGS and OpAGC. 
-
-#MLS Regression Tree
-
-```{r}
-set.seed(327)
-
-house_tree <- train(
-  mod_rec,
-  data = df_train, 
-  method = "rpart",
-  trControl = trainControl(method = "cv",
-                           number = 5,
-                           summaryFunction = model_stats,
-                           returnResamp = "all"),
-  na.action = na.exclude,
-  tuneGrid = data.frame(cp = 10^seq(-4, -2 , length = 20))
-)
-
-house_tree$results
-
-```
 
 
 ```{r}
