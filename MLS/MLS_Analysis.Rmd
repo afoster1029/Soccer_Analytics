@@ -411,7 +411,7 @@ cv_MLS_all_vars$results %>%
   geom_line(aes(x=nvmax,y=RMSE + RMSESD)) +
   geom_line(aes(x=nvmax,y=RMSE - RMSESD))
 ```
-*Discussion*
+*Using the stepwise selection method to examine which variables are most relavent for our model we can see that the best tune is 60 explanatory variables. The coefficients and the variabls are shown in the tidy table above. It's important to note that there are 50 variations of the team and opponent categorical variables because there are 26 teams total. The intercept is the Atlanta United team.*
 
 
 #### OLS
@@ -427,9 +427,25 @@ ols_model <- train(
   na.action = na.omit
 )
 summary(ols_model)
+ols_model$results
 ```
-*Discussion*
+*Using the stepwise selection as a guide we have chosen to run an OLS model with Team, Opponent and GoalsAllowed as the explanatory variables for Goals. Our model summary shows the coefficients and the RMSE is 1.213 when using the training data.*
 
+```{r}
+set.seed(123) 
+split <- trainControl(method = "cv", number = 5)
+
+ols_model_test <- train(
+  Goals ~ Team + Opponent + GoalsAllowed,
+  data = df_test,
+  method = "lm", 
+  trControl = split,
+  na.action = na.omit
+)
+summary(ols_model_test)
+ols_model_test$results
+```
+*When using our OlS model on the testing data we have an CV RMSE of 1.3 which is slightly higher than the training CV RMSE.*
 
 
 
