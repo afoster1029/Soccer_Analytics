@@ -3,7 +3,7 @@ title: "Predicting MLS Matches using Machine Learning Techniques"
 author: "Alex Foster, Chris Bajek, Webster An"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
-abstract: "Predicting the outcome or different statistics of sports is a massive market for betting and gambling. Additionally, in crisis such as a global pandemic, predicting results can be crucial for determining how the season would have ended. For this project, we will use different machine learning techniques that we learned in Statistical Machine Learning to determine how to predict the outcome of matches in the Major Socceer League. Using data on the MLS season from 2012-2019 we hope to predict the results of some of the intial matches of the 2020 season."
+abstract: "Predicting the outcome or different statistics of sports is a massive market for betting and gambling. Additionally, in crisis such as a global pandemic, predicting results can be crucial for determining how the season would have ended. For this project, we will use different machine learning techniques that we learned in Statistical Machine Learning to determine how to predict the outcome of matches in the Major Soccer League. Using data on the MLS season from 2012-2018 we hope to make some predictions regarding the 2019 season"
 
 ---
 
@@ -55,11 +55,12 @@ library(rpart.plot)
 
 ## Introduction
 
-Due to the COVID-19 pandemic in 2020, the majority sport leagues across the world have halted their seasons. This has lead to varying decisions of how to proceed. Since soccer does not have playoffs, the final standings of the league dictate which teams are promoted or relegated. This can have a massive finicial effect on teams in relegation and promotion positions. Some leagues have decided to cancel the rest of the remaining season, while other leagues, like France's Ligue 1, have decided to end the league as it stands, crowning the current 1st place team. This decision has resulted in several lawsuits. 
+Due to the COVID-19 pandemic in 2020, the majority of sports leagues across the world have halted their seasons. This has lead to varying decisions on how to proceed. Since soccer does not have playoffs, the final standings of the league dictate which teams are promoted or relegated. This can have a massive financial effect on teams in relegation and promotion positions. Some leagues have decided to cancel the rest of the remaining season, while other leagues, like France's Ligue 1, have decided to end the league as it stands, crowning the current 1st place team. This decision has resulted in several lawsuits. 
 
-In the USA, the Major League Soccer does not implement promotion or relegation and uses the playoff system like many other American sports leagues. However, due to the chaoes in European soccer leagues, we wanted to see if we could create a model that could predict the outcome of MLS matches. We intend to do this by predicting the number of goals each team will play in a match and compute the result based on thsoe predictions. 
+In the USA, Major League Soccer does not implement promotion or relegation and uses the playoff system like many other American sports leagues. However, due to the chaos in European soccer leagues, we wanted to see if we could create a model that could predict the number of goals each team will score in an MLS match. We intend to do this by examing each team's overall statistics for each game and team's season statistics as well. We recognize that this a very difficult task and that soccer, in particular, is one of the hardest sport's to model not only because of the lack of data but also due to the nature of the sport. 
 
-## Data 
+
+## The Dataset 
 
 ```{R,echo=FALSE, message=FALSE}
 MLS <- read_csv("USA.csv")
@@ -72,13 +73,13 @@ MLS <- MLS %>%
 
 ```
 
-The dataset that we used provides brief overall match statistics of all MLS matches from 2012-2020. The dataset was provided by http://www.football-data.co.uk/usa.php, which is used primarily to compute betting odds. As a result our dataset contains not only the relevant match information but also the betting odds for each potential result. Since 2012 there have been 2794 matches. The graph below represents the number of number of matches for each season. The increase of matches in each year is due to the constant expansion in the MLS. This means that in each new season there are brand new teams with no previous match data. We anticipate this having a negative effect on the performance of our models. 
+The dataset that we used provides brief overall match statistics of all MLS matches from 2012-2020. The dataset was provided by http://www.football-data.co.uk/usa.php, which is used primarily to compute betting odds. As a result, our dataset contains not only the relevant match information but also the betting odds for each potential result. Since 2012 there have been 2794 matches. The graph below represents the number of matches for each season. The increase of matches in each year is due to the constant expansion in MLS. This means that in each new season there are brand new teams with no previous match data. We anticipate this having a negative effect on the performance of our models. 
 
 ```{r,echo=FALSE,fig.align='center'}
 ggplot(MLS, aes(Season)) + geom_bar() + ylab("Total Games") + ggtitle("MLS Dataset")
 ```
 
-The initial dataset provided us with the outcome and date of each match, teams playing, number of goals scored by each team and betting odds. We recognized that we would need more explanatory variables. We created a function that would compute the league table prior to a given date. This allowed us to compute each teams average goals scored per game, average goals conceded per game for each match and their position in the league. However, even with our additional explanatory variables we wrangled our dataset to be better designed for predictive modeling. We split each match into two rows. This meant that each row represented a team with that teams relevant information. Ultimately, our plan is to have our response variable be Goals. Our dataset had the the following structure. 
+The initial dataset provided us with the outcome and date of each match, teams playing, the number of goals scored by each team and the betting odds. We recognized that we would need more explanatory variables. We created a function that would compute the league table prior to a given date. This allowed us to compute each team's average goals scored per game, average goals conceded per game for each match, and their position in the league. However, even with our additional explanatory variables, we wrangled our dataset to be better designed for predictive modeling. We split each match into two rows. This meant that each row represented a team with that team's relevant information. Ultimately, our plan is to have our response variable be Goals. Our dataset had the  following structure. 
 
 \newline
 
@@ -284,7 +285,7 @@ MLS_final <- MLS_final %>%
 
 ### Data Visualizations
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center'}
 # Distrbution of goals by season (broken into months)
 MLS_final %>% 
   ggplot(aes(x = Goals)) +
@@ -294,10 +295,13 @@ MLS_final %>%
   ggtitle("Goals by Season (Broken in to Months)") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*The visualization above shows the total number of goals scored by all teams over the months in which a season is played for each season in the data set. One can observe that the first few months have the highest amount of total goals because these are the months in which there is highest concentration of games.* 
+
+\newline
+
+*The visualization above shows the total number of goals scored by all teams over the months in which a season is played for each season in the data set. One can observe that the first few months have the highest amount of total goals because these are the months in which there is the highest concentration of games.* 
 
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center',warning=FALSE}
 # Distribution of full time results  by season
 MLS_final %>%
   ggplot(aes(x = Res)) +
@@ -308,10 +312,12 @@ MLS_final %>%
   ggtitle("Full Time Results by Season") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*The graph above depicts full time results as an Away Win (A), Draw (D), or Home Win (H). As we expect the most common result is a home win, seeming to prove that there is such a thing as home field advantage.* 
+\newline
 
+*The graph above depicts full-time results as an Away Win (A), Draw (D), or Home Win (H). As we expect the most common result is a home win, seeming to prove that there is such a thing as home-field advantage.* 
+\newline
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center',message=FALSE,warning=FALSE}
 # Total Goals by team
 MLS_final %>%
   ggplot(aes(x = Team, y = Goals)) +
@@ -321,11 +327,13 @@ MLS_final %>%
   ggtitle("Total Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*This plot shows the total number of goals scored by individual teams in the MLS. Total number of goals can be misleading though because some of the teams are much newer than others and haven't had an opportunity to score goals in all of the seasons in our data.* 
+\newline
+
+*This plot shows the total number of goals scored by individual teams in MLS. The Total number of goals can be misleading though because some of the teams are much newer than others and haven't had an opportunity to score goals in all of the seasons in our data.* 
+\newline
 
 
-
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center',message=FALSE,warning=FALSE}
 # Examining average goals scored
 MLS_final %>%
   group_by(Team) %>% 
@@ -338,11 +346,13 @@ MLS_final %>%
   ggtitle("Average Goals by Team") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+\newline
+
 *This plot is similar to the previous one except that it examines the average goals scored per game by each team. The Miami team and the Nashville team were just added to the league so it makes sense that they have little to no goal information.* 
 
+\newline
 
-
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center',warning=FALSE}
 # Examining relationship between AGS and Position by team
 MLS_final %>% 
   ggplot(aes(x=AGS, y=Position)) +
@@ -353,11 +363,13 @@ MLS_final %>%
   ggtitle("Average Goals by Table Position") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*The plots above show how the average number of goals relates to a teams position in the MLS table. The lower the position on the y-axis the better a team is doing (being 4th in the table is better than 24th). Generally it looks like the trend is that a higher number of average goals means a better position in the table.* 
+\newline
 
+*The plots above show how the average number of goals relates to a team's position in the MLS table. The lower the position on the y-axis the better a team is doing (being 4th in the table is better than 24th). Generally, it looks like the trend is that a higher number of average goals means a better position in the table.* 
 
+\newline
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,fig.align='center',warning=FALSE}
 # Number of goals scored by team during home games or away games
 MLS_final %>% 
   ggplot(aes(x=HA, y=Goals)) +
@@ -368,25 +380,30 @@ MLS_final %>%
   ggtitle("Total Goals Scored at Home and Away") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-*The plot above shows the number of home and away goals each team has scored over the seasons our data includes. Like the results graph show previously, we expect there to be a homefield advantage and this plot shows there is.* 
+\newline
+
+*The plot above shows the number of home and away goals each team has scored over the seasons our data includes. As the results graph show previously, we expect there to be a home-field advantage and this plot shows there is.* 
+
 
 ## Modeling: Predict Goals Variable
 
-##### Create training/testing set
-```{r, cache=TRUE,include=FALSE}
+#### Create training/testing set
+
+```{r, cache=TRUE,include=TRUE}
 df_modeling <- MLS_final
 df_train <- df_modeling[which(df_modeling$Season != 2019),]
 df_train <- df_modeling[which(df_train$Season != 2020),] # remove 2020 from training set.
 df_test <- df_modeling[which(df_modeling$Season == 2019),]
-cat("Training set contains",nrow(df_train), "rows")
-cat('\n')
-cat("Training set contains",nrow(df_test), "rows")
+
 ```
 
+Our training set includes all matches from 2012-2018 which is represented by 5006 rows. Our test set contains all matches in the 2019 season and contains 828 rows. 
 
+\newline
+\newline
 
 #### Stepwise Selection of Variables
-```{r, cache=TRUE}
+```{r, cache=TRUE,echo=FALSE, warning=FALSE}
 set.seed(123) 
 split <- trainControl(method = "cv", number = 5)
 
@@ -399,23 +416,30 @@ cv_MLS_all_vars <- train(
   na.action = na.omit
 )
 
-cv_MLS_all_vars$results
-cv_MLS_all_vars$bestTune
+# cv_MLS_all_vars$results
+# cv_MLS_all_vars$bestTune
 tidy(coef(cv_MLS_all_vars$finalModel,id=60))
 ```
 
-```{r}
+```{r,,echo=FALSE, message=FALSE,warning=FALSE,fig.align='center'}
 cv_MLS_all_vars$results %>% 
   ggplot() +
   geom_line(aes(x=nvmax,y=RMSE),color="blue") +
   geom_line(aes(x=nvmax,y=RMSE + RMSESD)) +
-  geom_line(aes(x=nvmax,y=RMSE - RMSESD))
+  geom_line(aes(x=nvmax,y=RMSE - RMSESD))+
+  theme_minimal() +
+  ggtitle("Stepwise Selection RMSE vs NVMax") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
-*Using the stepwise selection method to examine which variables are most relavent for our model we can see that the best tune is 60 explanatory variables. The coefficients and the variabls are shown in the tidy table above. It's important to note that there are 50 variations of the team and opponent categorical variables because there are 26 teams total. The intercept is the Atlanta United team.*
+\newline
 
+Using the stepwise selection method to examine which variables are most relevant for our model we can see that the best tune is 60 explanatory variables. The coefficients and the variables are shown in the tidy table above. It's important to note that there are 50 variations of the team and opponent categorical variables because there are 26 teams total. The intercept is the Atlanta United team.
+
+\newline
+\newline
 
 #### OLS
-```{r, cache=TRUE}
+```{r, cache=TRUE,echo=FALSE, message=FALSE, warning=FALSE}
 set.seed(123) 
 split <- trainControl(method = "cv", number = 5)
 
@@ -426,12 +450,12 @@ ols_model <- train(
   trControl = split,
   na.action = na.omit
 )
-summary(ols_model)
-ols_model$results
+tidy(summary(ols_model))
+# (ols_model$results)
 ```
-*Using the stepwise selection as a guide we have chosen to run an OLS model with Team, Opponent and GoalsAllowed as the explanatory variables for Goals. Our model summary shows the coefficients and the RMSE is 1.213 when using the training data.*
+Using the stepwise selection as a guide we have chosen to run an OLS model with Team, Opponent, and GoalsAllowed as the explanatory variables for Goals. Our model summary shows the coefficients and the RMSE is 1.213 when using the training data.
 
-```{r}
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 set.seed(123) 
 split <- trainControl(method = "cv", number = 5)
 
@@ -442,15 +466,16 @@ ols_model_test <- train(
   trControl = split,
   na.action = na.omit
 )
-summary(ols_model_test)
+# summary(ols_model_test)
 ols_model_test$results
 ```
-*When using our OlS model on the testing data we have an CV RMSE of 1.3 which is slightly higher than the training CV RMSE.*
+When using our OLS model on the testing data we have a CV RMSE of 1.3 which is slightly higher than the training CV RMSE.
 
+\newline
+\newline
 
-
-##### Lasso Model 
-```{r}
+#### Lasso Model 
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 
 model_stats <- function(data, lev = NULL, model = NULL) {
   
@@ -468,6 +493,9 @@ model_stats <- function(data, lev = NULL, model = NULL) {
 lambda_grid <- 10^seq(-4, -1 , length = 50)
 #Credit for Model_stats code goes to Lisa Lendway. 
 
+```
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 set.seed(327)
 MLS_lasso <- train(
   Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
@@ -484,9 +512,10 @@ MLS_lasso <- train(
   maximize = FALSE
 )
 
-MLS_lasso$results
-MLS_lasso$bestTune
-MLS_lasso$results$RMSE[1]
+```
+
+
+```{r,echo=TRUE, message=FALSE, warning=FALSE,results=FALSE}
 
 set.seed(327)
 MLS_lasso_small <- train(
@@ -503,13 +532,18 @@ MLS_lasso_small <- train(
   metric = "RMSE", 
   maximize = FALSE
 )
+```
 
-MLS_lasso_small$results
-MLS_lasso_small$bestTune
-MLS_lasso_small$results$RMSE[47]
+```{r,echo=FALSE,warning=FALSE}
+#MLS_lasso_small$results
+#MLS_lasso_small$bestTune
+#MLS_lasso_small$results$RMSE[47]
 best_lambda_small <- MLS_lasso_small$bestTune$lambda
-coefficients(MLS_lasso_small$finalModel, s = best_lambda_small)
+tidy(coefficients(MLS_lasso_small$finalModel, s = best_lambda_small))
 
+```
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 set.seed(327)
 MLS_lasso_small_test <- train(
   Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
@@ -525,17 +559,18 @@ MLS_lasso_small_test <- train(
   metric = "tRMSE", 
   maximize = FALSE
 )
-
-MLS_lasso_small_test$results
-coefficients(MLS_lasso_small_test$finalModel, s = best_lambda_small)
 ```
-*Discussion* We chose to run two lasso models, one normal lasso model, and one tuned to be the smallest model (the model with largest lambda within one standard error of the best models). Our first model produced an RMSE of 1.174427 and the smaller lasso model had an RMSE of 1.183064. Both of these values are similar to the OLS model, and higher than the Stepwise-Selection RMSE. 
+\newline
 
-If we examine the coefficients of the smallest model, only 4 terms remain, the largest coefficient being for GoalScCo = 0.029404969. 
+We chose to run two lasso models, one normal lasso model, and one tuned to be the smallest model (the model with the largest lambda within one standard error of the best models). Our first model produced an RMSE of 1.174427 and the smaller lasso model had an RMSE of 1.183064. Both of these values are better than the OLS model and higher than the Stepwise-Selection RMSE. We used the testing set on both these and found that we got an RMSE of 1.2379 for both. This is greater than the training set model RMSE than we would like.
 
-#MARS MLS Model
+When we examine the coefficients of the smallest model, only 4 terms remain, the largest coefficient being for GoalScCo = 0.029404969.
 
-```{r}
+\newline
+\newline
+#### MARS MLS Model
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 set.seed(327)
 
 MLS_mars <- train(
@@ -548,40 +583,46 @@ MLS_mars <- train(
                            returnResamp = "all"),
                            na.action = na.exclude,
                           
-                          
   tuneGrid = data.frame(degree = 1, nprune = 2:8)
 )
+```
 
+```{r,echo=TRUE, message=FALSE, warning=FALSE}
 MLS_mars_best <- train(
   Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo,
   data = df_train, 
   method = "earth",
-  #tuneGrid = data.frame(alpha = 1, lambda = lambda_grid),
   trControl = trainControl(method = "cv",
                            number = 5,
                            summaryFunction = model_stats,
                            returnResamp = "all",
                            selectionFunction = "best"),
                            na.action = na.exclude,
-  
-  
   tuneGrid = data.frame(degree = 1, nprune = 2:8)
- 
 )
-MLS_mars$results
-MLS_mars_best$results
+```
 
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
 
 partial(MLS_mars, pred.var = "GoalScCo", grid.resolution = 50) %>%
-  autoplot() 
+  autoplot()+
+  theme_minimal() +
+  ggtitle("Partial Dependence Plot of GoalScCo Variable") +
+  theme(plot.title = element_text(hjust = 0.5))
 
-partial(MLS_mars, pred.var = "HA", grid.resolution = 50) %>%
-  autoplot() 
+# partial(MLS_mars, pred.var = "HA", grid.resolution = 50) %>%
+#   autoplot() 
 ```
-*Discussion* The output of our Mars models yielded similar results to our previous models. The lowest RMSE of our models occured for both of them at the 4th prune, corresponding to an RMSE of 1.178. The partial dependence plot of GoalScCo indicates a linear relationship between Goals and this variable which is the sum of AGS and OpAGC. 
+\newline
 
+The output of our Mars models yielded similar results to our previous models. The lowest RMSE of our models occurred for both of them at the 4th prune, corresponding to an RMSE of 1.178. The partial dependence plot of GoalScCo indicates a linear relationship between Goals and this variable which is the sum of AGS and OpAGC. 
 
-```{r}
+\newline
+\newline
+
+#### KNN Model
+
+```{r,echo=FALSE, message=FALSE,cache=TRUE, warning=FALSE}
 set.seed(327)
 MLS_knn <- train(
   Goals ~ Team + AGS + Position + OpPosition + HA + TableDiff + OpAGC + GoalScCo, 
@@ -595,8 +636,11 @@ MLS_knn <- train(
   tuneGrid = data.frame(k = c(1:30)))
   
 
-MLS_knn$results
-MLS_knn$bestTune$k
+```
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+# MLS_knn$results
+# MLS_knn$bestTune$k
 
 MLS_knn$results %>%
   mutate(RMSESE = RMSESD/sqrt(5)) %>%
@@ -605,7 +649,27 @@ MLS_knn$results %>%
   geom_point() +
   geom_pointrange(aes(ymin=RMSE+RMSESE, ymax=RMSE-RMSESE)) +
   geom_line(aes(x=k, y=RMSE), color = "#0c4c8a") +
-  geom_hline(yintercept = 1.235700 + 0.02363899, color = "black")
+  geom_hline(yintercept = 1.235700 + 0.02363899, color = "black")+
+  theme_minimal() +
+  ggtitle("KNN RMSE vs K Value") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
-*Discussion* 
-When we run a KNN model the lowest RMSE, 1.2357, can be observed when k = 15. If we take a look at the the best tune parameter, this confirms that k = 15. However, there could be an argument for a model in which k = 10, as this is the simplest model within one RMSE standard error of k = 15. 
+\newline
+
+When we run a KNN model the lowest RMSE, 1.2357, can be observed when k = 15. If we take a look at the best tune parameter, this confirms that k = 15. This model is slightly higher RMSE value than the other models we have tested so far. However, there could be an argument for a model in which k = 10, as this is the simplest model within one RMSE standard error of k = 15.
+
+
+## Conclusion
+
+Overall, we found that it is very difficult to predict the outcome of games. We expected this to be the case. Additionally, we recognized prior to this project that our explanatory variables in our dataset, even after manipulations, were not that strong. Considering all of this we still found a final model. It is the lasso model that we created. Our two lasso models were created using different selection functions. We found that the first one had a lower RMSE value for the training set but that they both had the same RMSE for the testing set. This led us to go with our smaller lasso model because it was a simpler model.
+
+Additionally, we recognize that this model did not perform very well. We have also considered many future steps for this project. We would first like to start by adding more variables. There are several datasets that have ratings for every player and incorporating this would allow our models to not only compare overall team stats but individual player stats as well. Additionally, we would like to use these predictions of total goals scored by each team to compute the full-time result. By doing this we could call our predictions, compute the final result, and then simulate the rest of the season. We could then store our predictions and the final result and use them to rebuild our model for the next week of games. Unfortunately, these future steps were out the scope of time and resources we had for this project.
+
+
+
+
+
+
+
+
+
